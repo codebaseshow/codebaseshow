@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3J59EYJDH8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3J59EYJDH8');
+    </script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Set body colors ASAP to avoid a white page */
+      body {
+        color: #eceff1;
+        background-color: #263238;
+      }
+      /* Avoid an Emotion warning */
+      h1:first-child,
+      h2:first-child,
+      h3:first-child,
+      h4:first-child,
+      h5:first-child,
+      h6:first-child {
+        margin-top: 0 !important;
+      }
+    </style>
+    <%= htmlWebpackPlugin.tags.headTags %>
+  </head>
+  <body>
+    <noscript><p>Sorry, this site requires JavaScript to be enabled.</p></noscript>
+    <div id="root"></div>
+    <%= htmlWebpackPlugin.tags.bodyTags %>
+  </body>
+</html>
