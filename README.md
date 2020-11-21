@@ -5,11 +5,9 @@
 	<br>
 </p>
 
-> A collection of codebase examples to help you build your next project
+## What is this?
 
-## Overview
-
-...
+This is the monorepo of the [CodebaseShow](https://codebase.show) project.
 
 ## Contributing
 
