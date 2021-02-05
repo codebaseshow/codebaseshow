@@ -1,0 +1,16 @@
+{
+  "name": "@codebaseshow/website",
+  "version": "1.0.0",
+  "private": true,
+  "author": "Manuel Vila <hi@mvila.me>",
+  "license": "MIT",
+  "scripts": {
+    "deploy": "(cd ./backend && npm run deploy) && (cd ./frontend && npm run deploy)",
+    "postinstall": "(cd ./frontend && npm install) && (cd ./backend && npm install)",
+    "start": "concurrently --names=frontend,backend,database --prefix-colors=green,blue,gray --kill-others \"(cd ./frontend && npm run start)\" \"(cd ./backend && npm run start)\" \"(cd ./database && node ./start.js)\"",
+    "update": "npm update && (cd ./backend && npm update) && (cd ./frontend && npm update)"
+  },
+  "devDependencies": {
+    "concurrently": "^5.3.0"
+  }
+}
