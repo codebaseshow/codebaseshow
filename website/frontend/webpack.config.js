@@ -66,7 +66,7 @@ module.exports = (env, argv) => {
       new CleanWebpackPlugin(),
       new HtmlWebPackPlugin({
         template: './src/index.ejs',
-        favicon: './src/assets/codebaseshow-favicon-20201121.immutable.png',
+        favicon: './src/assets/codebaseshow-favicon-20210205.immutable.png',
         inject: false
       }),
       new webpack.EnvironmentPlugin(['BACKEND_URL', 'GITHUB_CLIENT_ID'])
