@@ -10,9 +10,9 @@
     "start": "webpack serve --mode=development"
   },
   "dependencies": {
-    "@emotion-kit/react": "^1.0.50",
-    "@emotion-starter/react": "^1.0.54",
-    "@emotion/react": "^11.1.4",
+    "@emotion-kit/react": "^1.0.52",
+    "@emotion-starter/react": "^1.0.55",
+    "@emotion/react": "^11.1.5",
     "@layr/browser-router": "^1.0.20",
     "@layr/component": "^1.1.2",
     "@layr/component-http-client": "^1.1.1",
@@ -20,7 +20,8 @@
     "@layr/routable": "^1.0.22",
     "@layr/storable": "^1.1.8",
     "@react-hook/window-size": "^3.0.7",
-    "date-fns": "^2.16.1",
+    "copy-webpack-plugin": "^7.0.0",
+    "date-fns": "^2.17.0",
     "lodash": "^4.17.20",
     "numeral": "^2.0.6",
     "react": "^17.0.1",
@@ -38,9 +39,10 @@
     "html-webpack-plugin": "^4.5.1",
     "simple-deployment": "^0.1.46",
     "terser-webpack-plugin": "^5.1.1",
-    "ts-loader": "^8.0.14",
+    "ts-loader": "^8.0.16",
+    "type-fest": "^0.20.2",
     "typescript": "^4.1.3",
-    "webpack": "^5.20.0",
+    "webpack": "^5.21.2",
     "webpack-cli": "^4.5.0",
     "webpack-dev-server": "^3.11.2"
   }

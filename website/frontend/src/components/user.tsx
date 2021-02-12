@@ -6,9 +6,9 @@ import {view, useAsyncCall} from '@layr/react-integration';
 import {DropdownMenu} from '@emotion-kit/react';
 
 import type {User as BackendUser} from '../../../backend/src/components/user';
+import type {Application} from './application';
 import type {Session} from './session';
 import type {Implementation} from './implementation';
-import type {Home} from './home';
 import type {Common} from './common';
 
 const githubClientId = process.env.GITHUB_CLIENT_ID;
@@ -21,14 +21,13 @@ export const getUser = (Base: typeof BackendUser) => {
   class User extends Routable(Base) {
     ['constructor']!: typeof User;
 
+    @consume() static Application: typeof Application;
     @consume() static Session: typeof Session;
     @consume() static Implementation: typeof Implementation;
-    @consume() static Home: typeof Home;
     @consume() static Common: typeof Common;
 
-    @view() Menu() {
+    @view() MenuView() {
       const User = this.constructor;
-      const {Implementation} = User;
 
       return (
         <DropdownMenu
@@ -47,14 +46,14 @@ export const getUser = (Base: typeof BackendUser) => {
             {
               label: 'Your implementations',
               onClick: () => {
-                Implementation.OwnedList.navigate();
+                User.ImplementationsPage.navigate();
               }
             },
             {type: 'divider'},
             {
               label: 'Sign out',
               onClick: () => {
-                User.SignOut.navigate();
+                User.SignOutPage.navigate();
               }
             }
           ]}
@@ -66,8 +65,6 @@ export const getUser = (Base: typeof BackendUser) => {
               alt="User menu"
               onClick={open}
               css={{
-                position: 'relative',
-                top: '-3px',
                 width: 40,
                 height: 40,
                 borderRadius: 20,
@@ -80,7 +77,11 @@ export const getUser = (Base: typeof BackendUser) => {
       );
     }
 
-    @route('/sign-in\\?:redirectURL') @view() static SignIn({redirectURL}: {redirectURL?: string}) {
+    @route('/sign-in\\?:redirectURL') @view() static SignInPage({
+      redirectURL
+    }: {
+      redirectURL?: string;
+    }) {
       const {Common} = this;
 
       return Common.ensureGuest(() => {
@@ -99,12 +100,12 @@ export const getUser = (Base: typeof BackendUser) => {
       });
     }
 
-    @route('/oauth/callback\\?:code&:state&:error') @view() static OAuthCallback({
+    @route('/oauth/callback\\?:code&:state&:error') @view() static OAuthCallbackPage({
       code,
       state,
       error
     }: {code?: string; state?: string; error?: string} = {}) {
-      const {Home, Common} = this;
+      const {Application, Common} = this;
 
       return Common.ensureGuest(() => {
         const [isSigningIn, signingInError] = useAsyncCall(async () => {
@@ -128,7 +129,7 @@ export const getUser = (Base: typeof BackendUser) => {
           if (decodedState.redirectURL !== undefined) {
             this.getRouter().reload(decodedState.redirectURL);
           } else {
-            Home.Main.reload();
+            Application.HomePage.reload();
           }
         });
 
@@ -138,9 +139,9 @@ export const getUser = (Base: typeof BackendUser) => {
 
         if (signingInError) {
           return (
-            <Common.ErrorLayout>
+            <Common.ErrorLayoutView>
               Sorry, an error occurred while signing in to GitHub.
-            </Common.ErrorLayout>
+            </Common.ErrorLayoutView>
           );
         }
 
@@ -148,14 +149,26 @@ export const getUser = (Base: typeof BackendUser) => {
       });
     }
 
-    @route('/sign-out') @view() static SignOut() {
-      const {Session, Home} = this;
+    @route('/sign-out') @view() static SignOutPage() {
+      const {Application, Session} = this;
 
       Session.token = undefined;
 
-      Home.Main.reload();
+      Application.HomePage.reload();
 
       return null;
+    }
+
+    @route('/user/implementations') @view() static ImplementationsPage() {
+      const {Application, Implementation, Common} = this;
+
+      return Common.ensureUser((user) => {
+        return (
+          <Application.LayoutView>
+            <Implementation.UserListView user={user} />
+          </Application.LayoutView>
+        );
+      });
     }
   }
 

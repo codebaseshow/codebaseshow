@@ -1,34 +1,38 @@
 import {provide} from '@layr/component';
 import {Storable} from '@layr/storable';
+import {Routable, route} from '@layr/routable';
 import {ComponentHTTPClient} from '@layr/component-http-client';
+import {Fragment} from 'react';
 import {jsx, useTheme} from '@emotion/react';
+import {Container, Stack} from '@emotion-kit/react';
 import {view, useBrowserRouter} from '@layr/react-integration';
-import {Container, DropdownMenu, ChevronDownIcon} from '@emotion-kit/react';
+import {PromiseValue} from 'type-fest';
 
 import type {Application as BackendApplication} from '../../../backend/src/components/application';
 import {getSession} from './session';
 import {getUser} from './user';
+import {getProject} from './project';
 import {getImplementation} from './implementation';
-import {Home} from './home';
 import {Common} from './common';
 // @ts-ignore
-import realWorldLogo from '../assets/realworld-logo-dark-mode-20201201.immutable.png';
+import codebaseShowLogo from '../assets/codebaseshow-logo-dark-mode-20210210.immutable.svg';
 // @ts-ignore
-import realWorldLogoNarrow from '../assets/realworld-logo-narrow-dark-mode-20201209.immutable.png';
+import programmerDude from '../assets/programmer-dude-20210205.immutable.svg';
+import {useStyles} from '../styles';
 
 export const getApplication = async ({backendURL}: {backendURL: string}) => {
   const client = new ComponentHTTPClient(backendURL, {mixins: [Storable]});
 
   const BackendApplicationProxy = (await client.getComponent()) as typeof BackendApplication;
 
-  class Application extends BackendApplicationProxy {
+  class Application extends Routable(BackendApplicationProxy) {
     @provide() static Session = getSession(BackendApplicationProxy.Session);
     @provide() static User = getUser(BackendApplicationProxy.User);
+    @provide() static Project = getProject(BackendApplicationProxy.Project);
     @provide() static Implementation = getImplementation(BackendApplicationProxy.Implementation);
-    @provide() static Home = Home;
     @provide() static Common = Common;
 
-    @view() static Root() {
+    @view() static RootView() {
       const {Common} = this;
 
       const [router, isReady] = useBrowserRouter(this);
@@ -38,20 +42,144 @@ export const getApplication = async ({backendURL}: {backendURL: string}) => {
       }
 
       const content = router.callCurrentRoute({
-        fallback: () => <Common.RouteNotFound />
+        fallback: () => <Common.RouteNotFoundView />
       });
 
-      return <this.Layout>{content}</this.Layout>;
+      return content;
     }
 
-    @view() static Layout({children}: {children?: React.ReactNode}) {
+    @route('/') @view() static HomePage() {
+      const {Project, Common} = this;
+
       const theme = useTheme();
 
       return (
-        <Common.FullHeight css={{display: 'flex', flexDirection: 'column'}}>
+        <>
+          <Common.FullHeightView
+            css={{display: 'flex', flexDirection: 'column', backgroundColor: '#242a5a'}}
+          >
+            <div css={{backgroundColor: '#2c3669'}}>
+              <Container>
+                <this.HeaderView />
+              </Container>
+            </div>
+
+            <Container
+              css={{
+                flex: 1,
+                width: '100%',
+                maxWidth: '960px',
+                padding: '2rem 15px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}
+            >
+              <div css={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+                <img src={programmerDude} alt="CodebaseShow" css={{width: '100%', maxWidth: 600}} />
+                <div
+                  css={theme.responsive({
+                    marginTop: '3rem',
+                    marginBottom: '.5rem',
+                    fontSize: [theme.fontSizes.h2, , , theme.fontSizes.h4],
+                    fontWeight: theme.fontWeights.semibold,
+                    lineHeight: theme.lineHeights.small,
+                    textAlign: 'center'
+                  })}
+                >
+                  Learn, Compare, Build
+                </div>
+                <div
+                  css={theme.responsive({
+                    fontSize: [theme.fontSizes.h4, , , theme.fontSizes.h5],
+                    fontWeight: theme.fontWeights.normal,
+                    color: theme.colors.text.muted,
+                    lineHeight: theme.lineHeights.normal,
+                    textAlign: 'center'
+                  })}
+                >
+                  {
+                    'A collection of codebase examples using various languages, libraries, and frameworks to help you create your next project.'
+                  }
+                </div>
+              </div>
+            </Container>
+
+            <div css={{paddingBottom: '2rem', alignSelf: 'center', display: 'flex'}}>
+              <this.HomePage.Link
+                hash="projects"
+                css={{
+                  'lineHeight': 1,
+                  'color': theme.colors.text.muted,
+                  ':hover': {color: theme.colors.text.normal, textDecoration: 'none'}
+                }}
+              >
+                ▼
+              </this.HomePage.Link>
+            </div>
+          </Common.FullHeightView>
+
+          <Common.FullHeightView id="projects" css={{display: 'flex', flexDirection: 'column'}}>
+            <Container
+              css={{
+                flex: 1,
+                width: '100%',
+                maxWidth: '960px',
+                padding: '3rem 15px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}
+            >
+              <h2 css={{marginBottom: '2.5rem'}}>Projects</h2>
+              <Project.ListView />
+              <Project.WantToAddMessageView css={{marginTop: '2.4rem'}} />
+            </Container>
+
+            <div css={{backgroundColor: theme.colors.background.highlighted}}>
+              <Container>
+                <this.FooterView />
+              </Container>
+            </div>
+          </Common.FullHeightView>
+        </>
+      );
+    }
+
+    @route('/projects') @view() static ProjectsPage() {
+      const {Project} = this;
+
+      return (
+        <this.LayoutView>
+          <div
+            css={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <h2 css={{marginBottom: '2.5rem'}}>Projects</h2>
+            <Project.ListView />
+            <Project.WantToAddMessageView css={{marginTop: '2.4rem'}} />
+          </div>
+        </this.LayoutView>
+      );
+    }
+
+    @view() static LayoutView({children}: {children?: React.ReactNode}) {
+      const {Common} = this;
+
+      const theme = useTheme();
+
+      return (
+        <Common.FullHeightView css={{display: 'flex', flexDirection: 'column'}}>
           <div css={{backgroundColor: theme.colors.background.highlighted}}>
             <Container>
-              <this.Header />
+              <this.HeaderView />
             </Container>
           </div>
 
@@ -60,6 +188,7 @@ export const getApplication = async ({backendURL}: {backendURL: string}) => {
               flex: 1,
               width: '100%',
               maxWidth: '960px',
+              padding: '3rem 15px',
               display: 'flex',
               flexDirection: 'column'
             }}
@@ -69,156 +198,47 @@ export const getApplication = async ({backendURL}: {backendURL: string}) => {
 
           <div css={{backgroundColor: theme.colors.background.highlighted}}>
             <Container>
-              <this.Footer />
+              <this.FooterView />
             </Container>
           </div>
-        </Common.FullHeight>
+        </Common.FullHeightView>
       );
     }
 
-    @view() static Header() {
-      const {Home, User, Session, Implementation} = this;
+    @view() static HeaderView() {
+      const {User, Session} = this;
 
       const {user} = Session;
 
       const theme = useTheme();
-
-      const menuStyle = {
-        paddingLeft: 0,
-        listStyle: 'none',
-        margin: 0,
-        display: 'flex',
-        alignItems: 'center'
-      };
-
-      const menuItemStyle = {
-        margin: '0 0 0 1.5rem',
-        display: 'flex'
-      };
-
-      const menuItemLinkStyle = {
-        'color': theme.colors.primary.normal,
-        'cursor': 'pointer',
-        ':hover': {
-          color: theme.colors.text.normal,
-          textDecoration: 'none'
-        }
-      };
+      const styles = useStyles();
 
       return (
-        <header css={{padding: '.5rem 0 .4rem 0', display: 'flex', alignItems: 'center'}}>
-          <Home.Main.Link css={{position: 'relative', top: '-5px'}}>
-            <img
-              src={realWorldLogo}
-              alt="RealWorld Example Apps"
-              css={theme.responsive({width: 300, display: [, , 'none']})}
-            />
-            <img
-              src={realWorldLogoNarrow}
-              alt="RealWorld Example Apps"
-              css={theme.responsive({width: 160, display: ['none', , 'inline-block']})}
-            />
-          </Home.Main.Link>
+        <header css={{minHeight: 60, padding: '.5rem 0', display: 'flex', alignItems: 'center'}}>
+          <this.HomePage.Link css={{display: 'flex', flexDirection: 'column'}}>
+            <img src={codebaseShowLogo} alt="CodebaseShow" css={{height: 35}} />
+          </this.HomePage.Link>
 
-          <nav css={{marginLeft: 'auto'}}>
-            <ul css={menuStyle}>
-              <li css={theme.responsive({...menuItemStyle, display: [, , 'none']})}>
-                <a
-                  href="https://github.com/gothinkster/realworld/tree/master/spec"
-                  target="_blank"
-                  css={menuItemLinkStyle}
-                >
-                  Create
-                </a>
-              </li>
+          <Stack spacing="1.5rem" css={{marginLeft: 'auto', alignItems: 'center'}}>
+            <this.ProjectsPage.Link
+              css={theme.responsive({...styles.menuItemLink, display: [, , , 'none']})}
+            >
+              Projects
+            </this.ProjectsPage.Link>
 
-              <li css={theme.responsive({...menuItemStyle, display: [, , 'none']})}>
-                <Implementation.Submit.Link css={menuItemLinkStyle}>
-                  Submit
-                </Implementation.Submit.Link>
-              </li>
-
-              {user?.isAdmin && (
-                <li css={theme.responsive({...menuItemStyle, display: [, , 'none']})}>
-                  <DropdownMenu
-                    items={[
-                      {
-                        label: 'Review submissions',
-                        onClick: () => {
-                          Implementation.ReviewList.navigate();
-                        }
-                      },
-                      {
-                        label: 'Edit implementations',
-                        onClick: () => {
-                          Implementation.List.navigate();
-                        }
-                      }
-                    ]}
-                  >
-                    {({open}) => (
-                      <div
-                        onClick={open}
-                        css={{
-                          ...menuItemLinkStyle,
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                      >
-                        Administration
-                        <ChevronDownIcon size={25} css={{marginLeft: '.15rem'}} />
-                      </div>
-                    )}
-                  </DropdownMenu>
-                </li>
-              )}
-
-              {user !== undefined ? (
-                <li css={menuItemStyle}>
-                  <user.Menu />
-                </li>
-              ) : (
-                <li css={menuItemStyle}>
-                  <User.SignIn.Link css={menuItemLinkStyle}>Sign in</User.SignIn.Link>
-                </li>
-              )}
-            </ul>
-          </nav>
+            {user !== undefined ? (
+              <user.MenuView />
+            ) : (
+              <User.SignInPage.Link css={styles.menuItemLink}>Sign in</User.SignInPage.Link>
+            )}
+          </Stack>
         </header>
       );
     }
 
-    @view() static Footer() {
-      const {Implementation} = this;
-
+    @view() static FooterView() {
       const theme = useTheme();
-
-      const headerStyle = {
-        marginBottom: '1.2rem',
-        fontSize: theme.fontSizes.small,
-        color: theme.colors.text.normal,
-        fontWeight: theme.fontWeights.bold,
-        textTransform: 'uppercase',
-        letterSpacing: '1px'
-      } as const;
-
-      const menuStyle = {
-        paddingLeft: 0,
-        listStyle: 'none',
-        margin: 0
-      };
-
-      const menuItemStyle = {
-        margin: '1rem 0 0 0'
-      };
-
-      const menuItemLinkStyle = {
-        'color': theme.colors.text.muted,
-        ':hover': {
-          color: theme.colors.text.normal,
-          textDecoration: 'none'
-        }
-      };
+      const styles = useStyles();
 
       return (
         <footer
@@ -231,7 +251,7 @@ export const getApplication = async ({backendURL}: {backendURL: string}) => {
           <nav
             css={theme.responsive({
               width: '100%',
-              maxWidth: 450,
+              maxWidth: 200,
               display: 'flex',
               flexDirection: ['row', , , 'column'],
               justifyContent: 'space-between',
@@ -239,47 +259,27 @@ export const getApplication = async ({backendURL}: {backendURL: string}) => {
             })}
           >
             <div>
-              <h6 css={headerStyle}>Contribute</h6>
-              <ul css={menuStyle}>
-                <li css={menuItemStyle}>
-                  <a
-                    href="https://github.com/gothinkster/realworld/tree/master/spec"
-                    target="_blank"
-                    css={menuItemLinkStyle}
-                  >
-                    Create an implementation
-                  </a>
-                </li>
-                <li css={menuItemStyle}>
-                  <Implementation.Submit.Link css={menuItemLinkStyle}>
-                    Submit an implementation
-                  </Implementation.Submit.Link>
-                </li>
-              </ul>
+              <Stack direction="column">
+                <this.HomePage.Link css={styles.menuItemLink}>Home</this.HomePage.Link>
+
+                <this.ProjectsPage.Link css={styles.menuItemLink}>Projects</this.ProjectsPage.Link>
+              </Stack>
             </div>
 
-            <div css={theme.responsive({marginTop: [0, , , '2rem']})}>
-              <h6 css={headerStyle}>GitHub</h6>
-              <ul css={menuStyle}>
-                <li css={menuItemStyle}>
-                  <a
-                    href="https://github.com/gothinkster/realworld"
-                    target="_blank"
-                    css={menuItemLinkStyle}
-                  >
-                    RealWorld repository
-                  </a>
-                </li>
-                <li css={menuItemStyle}>
-                  <a
-                    href="https://github.com/mvila/realworld-website"
-                    target="_blank"
-                    css={menuItemLinkStyle}
-                  >
-                    Website repository
-                  </a>
-                </li>
-              </ul>
+            <div css={theme.responsive({marginTop: [, , , '1rem']})}>
+              <Stack direction="column">
+                <a href="mailto:hello@codebase.show" target="_blank" css={styles.menuItemLink}>
+                  Contact
+                </a>
+
+                <a
+                  href="https://github.com/codebaseshow/codebaseshow"
+                  target="_blank"
+                  css={styles.menuItemLink}
+                >
+                  GitHub
+                </a>
+              </Stack>
             </div>
           </nav>
         </footer>
@@ -289,3 +289,7 @@ export const getApplication = async ({backendURL}: {backendURL: string}) => {
 
   return Application;
 };
+
+export declare const Application: PromiseValue<ReturnType<typeof getApplication>>;
+
+export type Application = InstanceType<typeof Application>;

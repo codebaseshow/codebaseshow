@@ -2,6 +2,7 @@ const webpack = require('webpack');
 const HtmlWebPackPlugin = require('html-webpack-plugin');
 const {CleanWebpackPlugin} = require('clean-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
+const CopyPlugin = require('copy-webpack-plugin');
 const path = require('path');
 
 module.exports = (env, argv) => {
@@ -66,10 +67,13 @@ module.exports = (env, argv) => {
       new CleanWebpackPlugin(),
       new HtmlWebPackPlugin({
         template: './src/index.ejs',
-        favicon: './src/assets/codebaseshow-favicon-20210205.immutable.png',
+        favicon: './src/assets/codebaseshow-favicon-20210212.immutable.png',
         inject: false
       }),
-      new webpack.EnvironmentPlugin(['BACKEND_URL', 'GITHUB_CLIENT_ID'])
+      new webpack.EnvironmentPlugin(['BACKEND_URL', 'GITHUB_CLIENT_ID']),
+      new CopyPlugin({
+        patterns: [{from: './src/assets/external', to: '.'}]
+      })
     ],
     ...(isProduction
       ? {

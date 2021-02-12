@@ -7,20 +7,20 @@ import {Button} from '@emotion-starter/react';
 import {Stack, Box, ErrorIcon} from '@emotion-kit/react';
 import {useWindowHeight} from '@react-hook/window-size';
 
-import type {Home} from './home';
+import type {Application} from './application';
 import type {User} from './user';
 import type {Session} from './session';
 
 export class Common extends Routable(Component) {
-  @consume() static Home: typeof Home;
+  @consume() static Application: typeof Application;
   @consume() static Session: typeof Session;
   @consume() static User: typeof User;
 
   static ensureGuest(content: () => JSX.Element | null) {
-    const {Home, Session} = this;
+    const {Application, Session} = this;
 
     if (Session.user !== undefined) {
-      Home.Main.redirect(undefined, {defer: true});
+      Application.HomePage.redirect(undefined, {defer: true});
       return null;
     }
 
@@ -31,7 +31,7 @@ export class Common extends Routable(Component) {
     const {User, Session} = this;
 
     if (Session.user === undefined) {
-      User.SignIn.redirect({redirectURL: this.getRouter().getCurrentPath()}, {defer: true});
+      User.SignInPage.redirect({redirectURL: this.getRouter().getCurrentPath()}, {defer: true});
       return null;
     }
 
@@ -42,36 +42,40 @@ export class Common extends Routable(Component) {
     const {User, Session} = this;
 
     if (Session.user === undefined) {
-      User.SignIn.redirect({redirectURL: this.getRouter().getCurrentPath()}, {defer: true});
+      User.SignInPage.redirect({redirectURL: this.getRouter().getCurrentPath()}, {defer: true});
       return null;
     }
 
     if (!Session.user.isAdmin) {
       return (
-        <this.ErrorLayout>Sorry, this page is restricted to administrators only.</this.ErrorLayout>
+        <this.ErrorLayoutView>
+          Sorry, this page is restricted to administrators only.
+        </this.ErrorLayoutView>
       );
     }
 
     return content(Session.user);
   }
 
-  @view() static FullHeight({
+  @view() static FullHeightView({
+    id,
     className,
     children
   }: {
+    id?: string;
     className?: string;
     children: React.ReactNode;
   }) {
     const height = useWindowHeight({initialHeight: 600});
 
     return (
-      <div className={className} css={{minHeight: height}}>
+      <div id={id} className={className} css={{minHeight: height}}>
         {children}
       </div>
     );
   }
 
-  @view() static Dialog({
+  @view() static DialogView({
     title,
     maxWidth = 600,
     children
@@ -88,7 +92,6 @@ export class Common extends Routable(Component) {
           css={theme.responsive({
             width: '100%',
             maxWidth,
-            margin: '3rem 0',
             padding: ['1.5rem 2rem 2rem 2rem', , , '0.5rem 1rem 1rem 1rem']
           })}
         >
@@ -99,18 +102,7 @@ export class Common extends Routable(Component) {
     );
   }
 
-  // @view() static ButtonBar({className, children}: {className?: string; children: React.ReactNode}) {
-  //   return (
-  //     <div
-  //       className={className}
-  //       css={{marginTop: '1rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center'}}
-  //     >
-  //       {children}
-  //     </div>
-  //   );
-  // }
-
-  @view() static ButtonBar({
+  @view() static ButtonBarView({
     alignment = 'left',
     className,
     children
@@ -133,7 +125,7 @@ export class Common extends Routable(Component) {
     );
   }
 
-  @view() static ErrorLayout({children}: {children: React.ReactNode}) {
+  @view() static ErrorLayoutView({children}: {children: React.ReactNode}) {
     const theme = useTheme();
 
     return (
@@ -154,11 +146,11 @@ export class Common extends Routable(Component) {
     );
   }
 
-  @view() static RouteNotFound() {
-    return <this.ErrorLayout>Sorry, there is nothing there.</this.ErrorLayout>;
+  @view() static RouteNotFoundView() {
+    return <this.ErrorLayoutView>Sorry, there is nothing there.</this.ErrorLayoutView>;
   }
 
-  @view() static ErrorBox({
+  @view() static ErrorBoxView({
     error,
     onRetry,
     className
@@ -169,12 +161,12 @@ export class Common extends Routable(Component) {
   }) {
     return (
       <Box className={className} css={{marginBottom: '2rem', padding: '.5rem 1rem'}}>
-        <this.ErrorMessage error={error} onRetry={onRetry} />
+        <this.ErrorMessageView error={error} onRetry={onRetry} />
       </Box>
     );
   }
 
-  @view() static ErrorMessage({
+  @view() static ErrorMessageView({
     error,
     onRetry,
     className
@@ -199,7 +191,7 @@ export class Common extends Routable(Component) {
     );
   }
 
-  @view() static LoadingSpinner({delay = 750}: {delay?: number}) {
+  @view() static LoadingSpinnerView({delay = 750}: {delay?: number}) {
     const style = useMemo(
       () => ({
         borderRadius: '50%',
@@ -218,7 +210,7 @@ export class Common extends Routable(Component) {
     );
 
     return (
-      <this.Delayed duration={delay}>
+      <this.DelayedView duration={delay}>
         <div className="loading-spinner" style={style}>
           <style>
             {`
@@ -229,11 +221,11 @@ export class Common extends Routable(Component) {
           `}
           </style>
         </div>
-      </this.Delayed>
+      </this.DelayedView>
     );
   }
 
-  @view() static Delayed({
+  @view() static DelayedView({
     duration = 750,
     children
   }: {
@@ -249,7 +241,7 @@ export class Common extends Routable(Component) {
     return null;
   }
 
-  @view() static Table<ItemType>({
+  @view() static TableView<ItemType>({
     columns = [],
     items = [],
     onItemClick,

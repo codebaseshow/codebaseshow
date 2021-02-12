@@ -1,20 +1,32 @@
 import {consume} from '@layr/component';
 import {Routable, route} from '@layr/routable';
-import {Fragment, useState, useMemo, useCallback} from 'react';
-import {view, useAsyncCallback, useAsyncMemo, useAsyncCall} from '@layr/react-integration';
+import {Fragment, useState, useCallback} from 'react';
+import {view, useAsyncCallback, useAsyncMemo} from '@layr/react-integration';
 import {jsx, useTheme} from '@emotion/react';
 import {Input, Select, Button} from '@emotion-starter/react';
-import {Stack, Box, Badge, ComboBox, DropdownMenu, FlagIcon, LaunchIcon} from '@emotion-kit/react';
+import {
+  Stack,
+  Box,
+  Badge,
+  ComboBox,
+  DropdownMenu,
+  StarIcon,
+  FlagIcon,
+  LaunchIcon
+} from '@emotion-kit/react';
 import compact from 'lodash/compact';
 import {formatDistanceToNowStrict} from 'date-fns';
 import numeral from 'numeral';
+import sortBy from 'lodash/sortBy';
+import partition from 'lodash/partition';
 
 import type {
   Implementation as BackendImplementation,
   ImplementationCategory,
   FrontendEnvironment
 } from '../../../backend/src/components/implementation';
-import type {Home} from './home';
+import type {User} from './user';
+import type {Project} from './project';
 import type {Common} from './common';
 import {useStyles} from '../styles';
 
@@ -117,78 +129,23 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
   class Implementation extends Routable(Base) {
     ['constructor']!: typeof Implementation;
 
-    @consume() static Home: typeof Home;
+    @consume() static User: typeof User;
+    @consume() static Project: typeof Project;
     @consume() static Common: typeof Common;
 
-    @route('/implementations/submit') @view() static Submit() {
-      const {Home, Common} = this;
-
-      return Common.ensureUser(() => {
-        const implementation = useMemo(
-          () =>
-            this.create(
-              {
-                repositoryURL: '',
-                frontendEnvironment: undefined,
-                language: '',
-                libraries: ['']
-              },
-              {attributeSelector: {id: true}}
-            ),
-          []
-        );
-
-        const [handleSubmit] = useAsyncCallback(async () => {
-          await implementation.submit();
-          this.SubmitCompleted.navigate();
-        });
-
-        return (
-          <implementation.Form
-            title="Submit an Implementation"
-            onSubmit={handleSubmit}
-            onCancel={async () => {
-              Home.Main.navigate();
-            }}
-          />
-        );
-      });
-    }
-
-    @route('/implementations/submit/completed') @view() static SubmitCompleted() {
-      const {Home, Common} = this;
-
-      return Common.ensureUser(() => {
-        return (
-          <Common.Dialog title={'Thank You!'}>
-            <p>Your submission has been recorded. We will review it shortly.</p>
-            <Common.ButtonBar>
-              <Button
-                onClick={() => {
-                  Home.Main.navigate();
-                }}
-                color="primary"
-              >
-                Okay
-              </Button>
-            </Common.ButtonBar>
-          </Common.Dialog>
-        );
-      });
-    }
-
-    @route('/implementations/:id/edit\\?:callbackURL') @view() static Edit({
+    @route('/implementations/:id/edit\\?:callbackURL') @view() static EditPage({
       id,
-      callbackURL = this.Home.Main.generateURL()
+      callbackURL
     }: {
       id: string;
       callbackURL?: string;
     }) {
-      const {Common} = this;
+      const {Project, Common} = this;
 
       return Common.ensureUser(() => {
         const [implementation, , loadingError] = useAsyncMemo(async () => {
           return await this.get(id, {
+            project: {slug: true},
             repositoryURL: true,
             category: true,
             frontendEnvironment: true,
@@ -199,272 +156,937 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
 
         if (loadingError !== undefined) {
           return (
-            <Common.ErrorLayout>
-              <Common.ErrorMessage error={loadingError} />
-            </Common.ErrorLayout>
+            <Common.ErrorLayoutView>
+              <Common.ErrorMessageView error={loadingError} />
+            </Common.ErrorLayoutView>
           );
         }
 
         if (implementation === undefined) {
-          return <Common.LoadingSpinner />;
+          return <Common.LoadingSpinnerView />;
         }
 
-        return (
-          <implementation.Form
-            title="Edit an Implementation"
-            onSave={async () => {
-              await implementation.save();
-              this.getRouter().navigate(callbackURL);
-            }}
-            onDelete={async () => {
-              await implementation.delete();
-              this.getRouter().navigate(callbackURL);
-            }}
-            onCancel={async () => {
-              this.getRouter().navigate(callbackURL);
-            }}
-          />
-        );
-      });
-    }
-
-    @route('/user/implementations') @view() static OwnedList() {
-      const {Common} = this;
-
-      return Common.ensureUser((owner) => {
-        const [implementations] = useAsyncMemo(async () => {
-          return await this.find(
-            {owner},
-            {
-              repositoryURL: true,
-              createdAt: true,
-              status: true
-            },
-            {sort: {createdAt: 'desc'}}
-          );
-        });
-
-        if (implementations === undefined) {
-          return <Common.LoadingSpinner />;
-        }
+        callbackURL ??= Project.HomePage.generateURL(implementation.project);
 
         return (
-          <div css={{margin: '2rem 0 3rem 0'}}>
-            <h3>Your Implementations</h3>
-
-            {implementations.length > 0 && (
-              <Common.Table
-                columns={[
-                  {
-                    header: 'Repository',
-                    body: (implementation) => implementation.formatRepositoryURL()
-                  },
-                  {
-                    width: 125,
-                    header: 'Status',
-                    body: (implementation) => implementation.formatStatus()
-                  },
-                  {
-                    width: 125,
-                    header: 'Submitted',
-                    body: (implementation) =>
-                      formatDistanceToNowStrict(implementation.createdAt, {addSuffix: true})
-                  }
-                ]}
-                items={implementations}
-                onItemClick={({id}) => {
-                  this.Edit.navigate({id, callbackURL: this.OwnedList.generatePath()});
+          <Project.LoaderView slug={implementation.project.slug}>
+            {() => (
+              <implementation.FormView
+                title="Edit an Implementation"
+                onSave={async () => {
+                  await implementation.save();
+                  this.getRouter().navigate(callbackURL!);
                 }}
-                css={{marginTop: '2rem'}}
+                onDelete={async () => {
+                  await implementation.delete();
+                  this.getRouter().navigate(callbackURL!);
+                }}
+                onCancel={async () => {
+                  this.getRouter().navigate(callbackURL!);
+                }}
               />
             )}
-
-            {implementations.length === 0 && (
-              <Box css={{marginTop: '2rem', padding: '1rem'}}>You have no implementations.</Box>
-            )}
-          </div>
+          </Project.LoaderView>
         );
       });
     }
 
-    @route('/implementations') @view() static List() {
-      const {Common} = this;
-
-      return Common.ensureAdmin(() => {
-        const [implementations] = useAsyncMemo(async () => {
-          return await this.find(
-            {},
-            {
-              repositoryURL: true,
-              repositoryStatus: true,
-              status: true,
-              createdAt: true
-            },
-            {sort: {createdAt: 'desc'}}
-          );
-        });
-
-        if (implementations === undefined) {
-          return <Common.LoadingSpinner />;
-        }
-
-        return (
-          <div css={{margin: '2rem 0 3rem 0'}}>
-            <h3>Edit Implementations</h3>
-
-            {implementations.length > 0 && (
-              <Common.Table
-                columns={[
-                  {
-                    header: 'Repository',
-                    body: (implementation) => (
-                      <>
-                        {implementation.formatRepositoryURL()}
-                        <implementation.RepositoryStatusBadge />
-                      </>
-                    )
-                  },
-                  {
-                    width: 125,
-                    header: 'Status',
-                    body: (implementation) => implementation.formatStatus()
-                  },
-                  {
-                    width: 125,
-                    header: 'Submitted',
-                    body: (implementation) =>
-                      formatDistanceToNowStrict(implementation.createdAt, {addSuffix: true})
-                  }
-                ]}
-                items={implementations}
-                onItemClick={({id}) => {
-                  this.Edit.navigate({id, callbackURL: this.List.generatePath()});
-                }}
-                css={{marginTop: '2rem'}}
-              />
-            )}
-
-            {implementations.length === 0 && (
-              <Box css={{marginTop: '2rem', padding: '1rem'}}>There are no implementations.</Box>
-            )}
-          </div>
-        );
-      });
-    }
-
-    @route('/implementations/review') @view() static ReviewList() {
-      const {Common} = this;
-
-      return Common.ensureAdmin(() => {
-        const [implementations] = useAsyncMemo(async () => {
-          return await this.findSubmissionsToReview();
-        });
-
-        if (implementations === undefined) {
-          return <Common.LoadingSpinner />;
-        }
-
-        return (
-          <div css={{margin: '2rem 0 3rem 0'}}>
-            <h3>Review Submissions</h3>
-
-            {implementations.length > 0 && (
-              <Common.Table
-                columns={[
-                  {
-                    width: 275,
-                    header: 'Repository',
-                    body: (implementation) => implementation.formatRepositoryURL()
-                  },
-                  {
-                    width: 100,
-                    header: 'Category',
-                    body: (implementation) =>
-                      (implementationCategories as any)[implementation.category].label
-                  },
-                  {
-                    width: 125,
-                    header: 'Environment',
-                    body: (implementation) =>
-                      implementation.frontendEnvironment !== undefined
-                        ? (frontendEnvironments as any)[implementation.frontendEnvironment].label
-                        : ''
-                  },
-                  {
-                    width: 125,
-                    header: 'Language',
-                    body: (implementation) => implementation.language
-                  },
-                  {
-                    header: 'Libraries/Frameworks',
-                    body: (implementation) => implementation.formatLibraries()
-                  },
-                  {
-                    width: 125,
-                    header: 'Submitted',
-                    body: (implementation) =>
-                      formatDistanceToNowStrict(implementation.createdAt, {addSuffix: true})
-                  }
-                ]}
-                items={implementations}
-                onItemClick={(implementation) => {
-                  this.Review.navigate(implementation);
-                }}
-                css={{marginTop: '2rem'}}
-              />
-            )}
-
-            {implementations.length === 0 && (
-              <Box css={{marginTop: '2rem', padding: '1rem'}}>
-                There are no submissions to review.
-              </Box>
-            )}
-          </div>
-        );
-      });
-    }
-
-    @route('/implementations/:id/review') @view() static Review({id}: {id: string}) {
-      const {Common} = this;
+    @route('/implementations/:id/review') @view() static ReviewPage({id}: {id: string}) {
+      const {Project, Common} = this;
 
       return Common.ensureAdmin(() => {
         const [implementation, , loadingError] = useAsyncMemo(async () => {
-          return await this.reviewSubmission(id);
+          const implementation = await this.get(id, {
+            project: {slug: true},
+            repositoryURL: true,
+            category: true,
+            frontendEnvironment: true,
+            language: true,
+            libraries: true
+          });
+
+          await implementation.reviewSubmission();
+
+          return implementation;
         }, [id]);
 
         if (loadingError !== undefined) {
           return (
-            <Common.ErrorLayout>
-              <Common.ErrorMessage error={loadingError} />
-            </Common.ErrorLayout>
+            <Common.ErrorLayoutView>
+              <Common.ErrorMessageView error={loadingError} />
+            </Common.ErrorLayoutView>
           );
         }
 
         if (implementation === undefined) {
-          return <Common.LoadingSpinner />;
+          return <Common.LoadingSpinnerView />;
         }
 
         return (
-          <implementation.Form
-            title="Review a Submission"
-            onApprove={async () => {
-              await implementation.approveSubmission();
-              this.ReviewList.navigate();
-            }}
-            onReject={async () => {
-              await implementation.rejectSubmission();
-              this.ReviewList.navigate();
-            }}
-            onCancel={async () => {
-              await implementation.cancelSubmissionReview();
-              this.ReviewList.navigate();
-            }}
-          />
+          <Project.LoaderView slug={implementation.project.slug}>
+            {(project) => (
+              <implementation.FormView
+                title="Review a Submission"
+                onApprove={async () => {
+                  await implementation.approveSubmission();
+                  Project.ReviewImplementationsPage.navigate(project);
+                }}
+                onReject={async () => {
+                  await implementation.rejectSubmission();
+                  Project.ReviewImplementationsPage.navigate(project);
+                }}
+                onCancel={async () => {
+                  await implementation.cancelSubmissionReview();
+                  Project.ReviewImplementationsPage.navigate(project);
+                }}
+              />
+            )}
+          </Project.LoaderView>
         );
       });
     }
 
-    @view() Form({
+    @route('/implementations/:id/report-as-unmaintained\\?:callbackURL')
+    @view()
+    static ReportAsUnmaintainedPage({id, callbackURL}: {id: string; callbackURL?: string}) {
+      const {Project, Common} = this;
+
+      return Common.ensureUser(() => {
+        const theme = useTheme();
+        const styles = useStyles();
+
+        const [implementation, , loadingError] = useAsyncMemo(async () => {
+          const implementation = await this.get(id, {
+            project: {slug: true},
+            repositoryURL: true,
+            libraries: true,
+            unmaintainedIssueNumber: true,
+            markedAsUnmaintainedOn: true
+          });
+
+          if (implementation.unmaintainedIssueNumber !== undefined) {
+            throw Object.assign(new Error('Implementation already reported as unmaintained'), {
+              displayMessage: 'This implementation has already been reported as unmaintained.'
+            });
+          }
+
+          if (implementation.markedAsUnmaintainedOn !== undefined) {
+            throw Object.assign(new Error('Implementation already marked as unmaintained'), {
+              displayMessage: 'This implementation has already been marked as unmaintained.'
+            });
+          }
+
+          return implementation;
+        }, [id]);
+
+        const [issueNumber, setIssueNumber] = useState('');
+
+        const [handleSubmit, isSubmitting, submitError] = useAsyncCallback(async () => {
+          await implementation!.reportAsUnmaintained(Number(issueNumber));
+          this.ReportAsUnmaintainedCompletedPage.navigate({id: implementation!.id, callbackURL});
+        }, [implementation, issueNumber, callbackURL]);
+
+        if (loadingError !== undefined) {
+          return (
+            <Common.ErrorLayoutView>
+              <Common.ErrorMessageView error={loadingError} />
+            </Common.ErrorLayoutView>
+          );
+        }
+
+        if (implementation === undefined || isSubmitting) {
+          return <Common.LoadingSpinnerView />;
+        }
+
+        callbackURL ??= Project.HomePage.generateURL(implementation.project);
+
+        return (
+          <Project.LoaderView slug={implementation.project.slug}>
+            {() => (
+              <Common.DialogView title="Report an Implementation as Unmaintained">
+                <a href={implementation.repositoryURL} target="_blank" css={styles.hiddenLink}>
+                  <Box css={{padding: '.75rem 1rem', lineHeight: theme.lineHeights.small}}>
+                    <div
+                      css={{
+                        fontSize: theme.fontSizes.large,
+                        fontWeight: theme.fontWeights.semibold
+                      }}
+                    >
+                      {implementation.formatLibraries()}
+                    </div>
+
+                    <div
+                      css={{
+                        marginTop: '.3rem',
+                        color: theme.colors.text.muted
+                      }}
+                    >
+                      {implementation.formatRepositoryURL()}
+                    </div>
+                  </Box>
+                </a>
+
+                <p css={{marginTop: '1.5rem'}}>
+                  If you think that this implementation is no longer maintained, please post a new
+                  issue (or reference an existing issue) in the{' '}
+                  <a href={implementation.repositoryURL} target="_blank">
+                    implementation repository
+                  </a>{' '}
+                  with a title such as <strong>"Is this repository still maintained?"</strong> and
+                  enter the issue number below.
+                </p>
+
+                <p>
+                  If the issue remains <strong>open for a period of 30 days</strong>, the
+                  implementation will be automatically marked as unmaintained and it will be removed
+                  from the implementation list.
+                </p>
+
+                {submitError && (
+                  <Common.ErrorBoxView error={submitError} css={{marginBottom: '1rem'}} />
+                )}
+
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    handleSubmit();
+                  }}
+                  autoComplete="off"
+                >
+                  <div css={styles.control}>
+                    <label htmlFor="issueNumber" css={styles.label}>
+                      Issue number
+                    </label>
+                    <Input
+                      id="issueNumber"
+                      value={issueNumber}
+                      onChange={(event) => {
+                        setIssueNumber(event.target.value);
+                      }}
+                      placeholder="123"
+                      required
+                      pattern="[0-9]+"
+                      autoFocus
+                      css={{width: 150}}
+                    />
+                  </div>
+
+                  <Common.ButtonBarView>
+                    <Button type="submit" color="primary">
+                      Report
+                    </Button>
+                    <Button
+                      onClick={(event) => {
+                        event.preventDefault();
+                        this.getRouter().navigate(callbackURL!);
+                      }}
+                      variant="outline"
+                    >
+                      Cancel
+                    </Button>
+                  </Common.ButtonBarView>
+                </form>
+              </Common.DialogView>
+            )}
+          </Project.LoaderView>
+        );
+      });
+    }
+
+    @route('/implementations/:id/report-as-unmaintained/completed\\?:callbackURL')
+    @view()
+    static ReportAsUnmaintainedCompletedPage({id, callbackURL}: {id: string; callbackURL: string}) {
+      const {Project, Common} = this;
+
+      return Common.ensureUser(() => {
+        const [implementation, , loadingError] = useAsyncMemo(async () => {
+          return await this.get(id, {project: {slug: true}});
+        }, [id]);
+
+        if (loadingError !== undefined) {
+          return (
+            <Common.ErrorLayoutView>
+              <Common.ErrorMessageView error={loadingError} />
+            </Common.ErrorLayoutView>
+          );
+        }
+
+        if (implementation === undefined) {
+          return <Common.LoadingSpinnerView />;
+        }
+
+        return (
+          <Project.LoaderView slug={implementation.project.slug}>
+            {() => (
+              <Common.DialogView title={'Thank You!'}>
+                <p>Your report has been recorded.</p>
+                <Common.ButtonBarView>
+                  <Button
+                    onClick={() => {
+                      this.getRouter().navigate(callbackURL);
+                    }}
+                    color="primary"
+                  >
+                    Okay
+                  </Button>
+                </Common.ButtonBarView>
+              </Common.DialogView>
+            )}
+          </Project.LoaderView>
+        );
+      });
+    }
+
+    @route('/implementations/:id/approve-unmaintained-report\\?:token')
+    @view()
+    static ApproveUnmaintainedReportPage({id, token}: {id: string; token: string}) {
+      const {Project, Common} = this;
+
+      return Common.ensureAdmin(() => {
+        const [implementation, , loadingError] = useAsyncMemo(async () => {
+          const implementation = await this.get(id, {project: {slug: true}});
+
+          await this.approveUnmaintainedReport(token);
+
+          return implementation;
+        }, [id, token]);
+
+        if (loadingError !== undefined) {
+          return (
+            <Common.ErrorLayoutView>
+              <Common.ErrorMessageView error={loadingError} />
+            </Common.ErrorLayoutView>
+          );
+        }
+
+        if (implementation === undefined) {
+          return <Common.LoadingSpinnerView />;
+        }
+
+        return (
+          <Project.LoaderView slug={implementation.project.slug}>
+            {() => (
+              <Common.DialogView title={'Unmaintained Implementation Report'} maxWidth={650}>
+                <p>The report has been approved.</p>
+                <Common.ButtonBarView>
+                  <Button
+                    onClick={() => {
+                      Project.HomePage.navigate(implementation.project);
+                    }}
+                    color="primary"
+                  >
+                    Okay
+                  </Button>
+                </Common.ButtonBarView>
+              </Common.DialogView>
+            )}
+          </Project.LoaderView>
+        );
+      });
+    }
+
+    @view() static ListView({
+      project,
+      category: currentCategory = 'frontend',
+      language: currentLanguage = 'all',
+      className
+    }: {
+      project: Project;
+      category?: ImplementationCategory;
+      language?: string;
+      className?: string;
+    }) {
+      const {Common} = this;
+
+      const theme = useTheme();
+      const styles = useStyles();
+
+      const [implementations, , loadingError] = useAsyncMemo(async () => {
+        const all = await this.find(
+          {project, category: currentCategory, status: 'approved', repositoryStatus: 'available'},
+          {
+            repositoryURL: true,
+            frontendEnvironment: true,
+            language: true,
+            libraries: true,
+            numberOfStars: true,
+            markedAsUnmaintainedOn: true
+          },
+          {sort: {numberOfStars: 'desc'}}
+        );
+
+        const [active, unmaintained] = partition(
+          all,
+          (implementation) => implementation.markedAsUnmaintainedOn === undefined
+        );
+
+        return {all, active, unmaintained};
+      }, [currentCategory]);
+
+      const filterImplementationsByLanguage = useCallback(
+        (implementations: Implementation[]) =>
+          implementations.filter(({language}) =>
+            currentLanguage !== 'all' ? language.toLowerCase() === currentLanguage : true
+          ),
+        [currentLanguage]
+      );
+
+      if (loadingError) {
+        return (
+          <Common.ErrorLayoutView>
+            <Common.ErrorMessageView error={loadingError} />
+          </Common.ErrorLayoutView>
+        );
+      }
+
+      return (
+        <div className={className}>
+          <this.CategoryFilterView project={project} currentCategory={currentCategory} />
+
+          {implementations === undefined && (
+            <div css={{marginBottom: 2000}}>
+              <Common.LoadingSpinnerView />
+            </div>
+          )}
+
+          {implementations !== undefined && implementations.all.length > 0 && (
+            <div css={{marginTop: '2rem', display: 'flex'}}>
+              <div css={theme.responsive({marginRight: '3rem', display: ['block', , 'none']})}>
+                <this.LanguageFilterView
+                  implementations={implementations.all}
+                  currentLanguage={currentLanguage}
+                />
+              </div>
+
+              <div css={{flex: 1}}>
+                <Stack direction="column" spacing="2rem">
+                  {(() => {
+                    const filteredImplementations = filterImplementationsByLanguage(
+                      implementations.active
+                    );
+
+                    if (filteredImplementations.length === 0) {
+                      return null;
+                    }
+
+                    return (
+                      <div>
+                        {filteredImplementations.map((implementation, index) => (
+                          <Fragment key={implementation.id}>
+                            {index > 0 && (
+                              <hr css={{marginTop: '.75rem', marginBottom: '.75rem'}} />
+                            )}
+
+                            <a
+                              href={implementation.repositoryURL}
+                              target="_blank"
+                              css={styles.hiddenLink}
+                            >
+                              <div
+                                css={{
+                                  'display': 'flex',
+                                  'flexWrap': 'wrap',
+                                  'alignItems': 'center',
+                                  ':hover': {
+                                    '.implementation-flag-menu': {
+                                      opacity: 1
+                                    }
+                                  }
+                                }}
+                              >
+                                <div
+                                  css={theme.responsive({
+                                    flex: ['1', , , '1 0 100%'],
+                                    marginBottom: [, , , '.5rem'],
+                                    paddingRight: ['1rem', , , '0'],
+                                    lineHeight: theme.lineHeights.small
+                                  })}
+                                >
+                                  <div css={{display: 'flex', alignItems: 'center'}}>
+                                    <div
+                                      css={{
+                                        fontSize: theme.fontSizes.large,
+                                        fontWeight: theme.fontWeights.semibold
+                                      }}
+                                    >
+                                      {implementation.formatLibraries()}
+                                    </div>
+                                    {implementation.frontendEnvironment !== undefined &&
+                                      implementation.frontendEnvironment !== 'web' && (
+                                        <Badge
+                                          color="primary"
+                                          variant="outline"
+                                          css={{marginLeft: '.75rem'}}
+                                        >
+                                          {implementation.formatFrontendEnvironment()}
+                                        </Badge>
+                                      )}
+                                    <implementation.FlagMenuView
+                                      className="implementation-flag-menu"
+                                      css={theme.responsive({
+                                        display: ['block', , , 'none'],
+                                        marginLeft: '.5rem',
+                                        opacity: 0
+                                      })}
+                                    />
+                                  </div>
+                                  <div
+                                    css={{
+                                      marginTop: '.3rem',
+                                      color: theme.colors.text.muted,
+                                      wordBreak: 'break-word'
+                                    }}
+                                  >
+                                    {implementation.formatRepositoryURL()}
+                                  </div>
+                                </div>
+
+                                <div css={{width: '150px', lineHeight: 1}}>
+                                  {implementation.language}
+                                </div>
+
+                                <div
+                                  css={{
+                                    width: '90px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    lineHeight: 1
+                                  }}
+                                >
+                                  <StarIcon
+                                    size={20}
+                                    color={theme.colors.text.muted}
+                                    outline
+                                    css={{marginRight: '.25rem'}}
+                                  />
+                                  {implementation.formatNumberOfStars()}
+                                </div>
+                              </div>
+                            </a>
+                          </Fragment>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  {(() => {
+                    const filteredImplementations = filterImplementationsByLanguage(
+                      implementations.unmaintained
+                    );
+
+                    if (filteredImplementations.length === 0) {
+                      return null;
+                    }
+
+                    return (
+                      <Box css={{padding: '.75rem 1rem'}}>
+                        <strong css={{fontWeight: theme.fontWeights.semibold}}>
+                          Unmaintained implementations:
+                        </strong>{' '}
+                        {filteredImplementations.map((implementation, index) => (
+                          <Fragment key={index}>
+                            {index > 0 && (
+                              <span
+                                css={{
+                                  color: theme.colors.text.moreMuted
+                                }}
+                              >
+                                &nbsp;|{' '}
+                              </span>
+                            )}
+                            <a
+                              href={implementation.repositoryURL}
+                              target="_blank"
+                              css={{'color': 'inherit', ':hover': {color: 'inherit'}}}
+                            >
+                              {implementation.formatLibraries()}
+                            </a>
+                          </Fragment>
+                        ))}
+                      </Box>
+                    );
+                  })()}
+                </Stack>
+              </div>
+            </div>
+          )}
+
+          {implementations !== undefined && implementations.all.length === 0 && (
+            <Box css={{marginTop: '2rem', padding: '1rem'}}>
+              There are no implementations in this category.
+            </Box>
+          )}
+        </div>
+      );
+    }
+
+    @view() static CategoryFilterView({
+      project,
+      currentCategory
+    }: {
+      project: Project;
+      currentCategory: ImplementationCategory;
+    }) {
+      const theme = useTheme();
+
+      return (
+        <div
+          css={{
+            display: 'flex',
+            justifyContent: 'center',
+            borderBottom: `1px solid ${theme.colors.border.normal}`
+          }}
+        >
+          <div
+            css={{
+              display: 'flex',
+              borderTop: `1px solid ${theme.colors.border.normal}`,
+              borderLeft: `1px solid ${theme.colors.border.normal}`,
+              borderRight: `1px solid ${theme.colors.border.normal}`,
+              borderTopLeftRadius: theme.radii.large,
+              borderTopRightRadius: theme.radii.large
+            }}
+          >
+            {project.categories.map((category, index) => (
+              <this.CategoryTabView
+                key={category}
+                category={category}
+                isCurrent={currentCategory === category}
+                isFirst={index === 0}
+                isLast={index === project.categories.length - 1}
+              />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    @view() static CategoryTabView({
+      category,
+      isCurrent,
+      isFirst = false,
+      isLast = false
+    }: {
+      category: ImplementationCategory;
+      isCurrent: boolean;
+      isFirst?: boolean;
+      isLast?: boolean;
+    }) {
+      const {Project} = this;
+
+      const theme = useTheme();
+      const styles = useStyles();
+
+      const params = this.getRouter().getCurrentParams();
+
+      return (
+        <Project.HomePage.Link
+          params={{...params, category, language: undefined}}
+          css={styles.hiddenLink}
+        >
+          <div
+            css={theme.responsive({
+              'padding': ['.75rem 1.25rem', , , '.5rem .75rem'],
+              'fontSize': [theme.fontSizes.large, , , theme.fontSizes.normal],
+              'lineHeight': theme.lineHeights.small,
+              'color': isCurrent ? theme.colors.primary.textOnNormal : undefined,
+              'backgroundColor': isCurrent ? theme.colors.primary.normal : undefined,
+              'borderLeft': !isFirst ? `1px solid ${theme.colors.border.normal}` : undefined,
+              'borderTopLeftRadius': isFirst ? theme.radii.normal : undefined,
+              'borderTopRightRadius': isLast ? theme.radii.normal : undefined,
+              ':hover': {
+                backgroundColor: !isCurrent ? theme.colors.background.highlighted : undefined
+              }
+            })}
+          >
+            {implementationCategories[category].label}
+          </div>
+        </Project.HomePage.Link>
+      );
+    }
+
+    @view() static LanguageFilterView({
+      implementations,
+      currentLanguage
+    }: {
+      implementations: Implementation[];
+      currentLanguage: string;
+    }) {
+      const theme = useTheme();
+
+      const languages: {[language: string]: number} = Object.create(null);
+
+      for (const {language} of implementations) {
+        if (language in languages) {
+          languages[language]++;
+        } else {
+          languages[language] = 1;
+        }
+      }
+
+      const sortedLanguages = sortBy(Object.entries(languages), ([, count]) => -count).map(
+        ([language]) => language
+      );
+
+      sortedLanguages.unshift('All');
+
+      return (
+        <div>
+          <div
+            css={{
+              fontSize: theme.fontSizes.small,
+              color: theme.colors.text.muted,
+              fontWeight: theme.fontWeights.bold,
+              textTransform: 'uppercase',
+              letterSpacing: '1px'
+            }}
+          >
+            Languages
+          </div>
+
+          {sortedLanguages.map((language) => (
+            <this.LanguageOptionView
+              key={language}
+              language={language}
+              isCurrent={language.toLowerCase() === currentLanguage}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    @view() static LanguageOptionView({
+      language,
+      isCurrent
+    }: {
+      language: string;
+      isCurrent: boolean;
+    }) {
+      const {Project} = this;
+
+      const theme = useTheme();
+      const styles = useStyles();
+
+      const params = this.getRouter().getCurrentParams();
+
+      return (
+        <Project.HomePage.Link
+          params={{...params, language: language.toLowerCase()}}
+          css={styles.hiddenLink}
+        >
+          <div
+            css={{
+              'marginTop': '.5rem',
+              'fontSize': theme.fontSizes.normal,
+              'lineHeight': theme.lineHeights.small,
+              'color': isCurrent ? theme.colors.text.normal : theme.colors.text.muted,
+              ':hover': {
+                textDecoration: 'underline'
+              }
+            }}
+          >
+            {language}
+          </div>
+        </Project.HomePage.Link>
+      );
+    }
+
+    @view() static EditListView({project}: {project: Project}) {
+      const {Common} = this;
+
+      const [implementations] = useAsyncMemo(async () => {
+        return await this.find(
+          {project},
+          {
+            project: {slug: true},
+            repositoryURL: true,
+            repositoryStatus: true,
+            status: true,
+            createdAt: true
+          },
+          {sort: {createdAt: 'desc'}}
+        );
+      });
+
+      if (implementations === undefined) {
+        return <Common.LoadingSpinnerView />;
+      }
+
+      return (
+        <div>
+          <h3>Edit Implementations</h3>
+
+          {implementations.length > 0 && (
+            <Common.TableView
+              columns={[
+                {
+                  header: 'Repository',
+                  body: (implementation) => (
+                    <>
+                      {implementation.formatRepositoryURL()}
+                      <implementation.RepositoryStatusBadgeView />
+                    </>
+                  )
+                },
+                {
+                  width: 125,
+                  header: 'Status',
+                  body: (implementation) => implementation.formatStatus()
+                },
+                {
+                  width: 125,
+                  header: 'Submitted',
+                  body: (implementation) =>
+                    formatDistanceToNowStrict(implementation.createdAt, {addSuffix: true})
+                }
+              ]}
+              items={implementations}
+              onItemClick={({id}) => {
+                this.EditPage.navigate({id, callbackURL: this.getRouter().getCurrentURL()});
+              }}
+              css={{marginTop: '2rem'}}
+            />
+          )}
+
+          {implementations.length === 0 && (
+            <Box css={{marginTop: '2rem', padding: '1rem'}}>There are no implementations.</Box>
+          )}
+        </div>
+      );
+    }
+
+    @view() static ReviewListView({project}: {project: Project}) {
+      const {Common} = this;
+
+      const [implementations] = useAsyncMemo(async () => {
+        return await this.findSubmissionsToReview({project});
+      });
+
+      if (implementations === undefined) {
+        return <Common.LoadingSpinnerView />;
+      }
+
+      return (
+        <div>
+          <h3>Review Submissions</h3>
+
+          {implementations.length > 0 && (
+            <Common.TableView
+              columns={[
+                {
+                  width: 275,
+                  header: 'Repository',
+                  body: (implementation) => implementation.formatRepositoryURL()
+                },
+                {
+                  width: 100,
+                  header: 'Category',
+                  body: (implementation) =>
+                    (implementationCategories as any)[implementation.category].label
+                },
+                {
+                  width: 125,
+                  header: 'Environment',
+                  body: (implementation) =>
+                    implementation.frontendEnvironment !== undefined
+                      ? (frontendEnvironments as any)[implementation.frontendEnvironment].label
+                      : ''
+                },
+                {
+                  width: 125,
+                  header: 'Language',
+                  body: (implementation) => implementation.language
+                },
+                {
+                  header: 'Libraries/Frameworks',
+                  body: (implementation) => implementation.formatLibraries()
+                },
+                {
+                  width: 125,
+                  header: 'Submitted',
+                  body: (implementation) =>
+                    formatDistanceToNowStrict(implementation.createdAt, {addSuffix: true})
+                }
+              ]}
+              items={implementations}
+              onItemClick={(implementation) => {
+                this.ReviewPage.navigate(implementation);
+              }}
+              css={{marginTop: '2rem'}}
+            />
+          )}
+
+          {implementations.length === 0 && (
+            <Box css={{marginTop: '2rem', padding: '1rem'}}>
+              There are no submissions to review.
+            </Box>
+          )}
+        </div>
+      );
+    }
+
+    @view() static UserListView({user}: {user: User}) {
+      const {Common} = this;
+
+      const [implementations] = useAsyncMemo(async () => {
+        return await Implementation.find(
+          {owner: user},
+          {
+            project: {slug: true},
+            repositoryURL: true,
+            createdAt: true,
+            status: true
+          },
+          {sort: {createdAt: 'desc'}}
+        );
+      });
+
+      if (implementations === undefined) {
+        return <Common.LoadingSpinnerView />;
+      }
+
+      return (
+        <div>
+          <h3>Your Implementations</h3>
+
+          {implementations.length > 0 && (
+            <Common.TableView
+              columns={[
+                {
+                  header: 'Repository',
+                  body: (implementation) => implementation.formatRepositoryURL()
+                },
+                {
+                  width: 125,
+                  header: 'Status',
+                  body: (implementation) => implementation.formatStatus()
+                },
+                {
+                  width: 125,
+                  header: 'Submitted',
+                  body: (implementation) =>
+                    formatDistanceToNowStrict(implementation.createdAt, {addSuffix: true})
+                }
+              ]}
+              items={implementations}
+              onItemClick={({id}) => {
+                Implementation.EditPage.navigate({
+                  id,
+                  callbackURL: this.getRouter().getCurrentURL()
+                });
+              }}
+              css={{marginTop: '2rem'}}
+            />
+          )}
+
+          {implementations.length === 0 && (
+            <Box css={{marginTop: '2rem', padding: '1rem'}}>You have no implementations.</Box>
+          )}
+        </div>
+      );
+    }
+
+    @view() FormView({
       title,
       onSubmit,
       onSave,
@@ -526,7 +1148,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
         submitError || saveError || deleteError || approveError || rejectError || cancelError;
 
       if (isBusy) {
-        return <Common.LoadingSpinner />;
+        return <Common.LoadingSpinnerView />;
       }
 
       if (this.libraries[this.libraries.length - 1] !== '') {
@@ -545,7 +1167,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
           : '';
 
       return (
-        <Common.Dialog title={title}>
+        <Common.DialogView title={title}>
           <form
             onSubmit={
               onSubmit || onSave
@@ -562,7 +1184,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
             }
             autoComplete="off"
           >
-            {error && <Common.ErrorBox error={error} />}
+            {error && <Common.ErrorBoxView error={error} />}
 
             <Stack direction="column">
               <div css={styles.control}>
@@ -679,7 +1301,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
               </div>
             </Stack>
 
-            <Common.ButtonBar>
+            <Common.ButtonBarView>
               {onSubmit && (
                 <Button type="submit" color="primary">
                   Submit
@@ -736,13 +1358,13 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
               >
                 Cancel
               </Button>
-            </Common.ButtonBar>
+            </Common.ButtonBarView>
           </form>
-        </Common.Dialog>
+        </Common.DialogView>
       );
     }
 
-    @view() RepositoryStatusBadge() {
+    @view() RepositoryStatusBadgeView() {
       if (this.repositoryStatus === 'available') {
         return null;
       }
@@ -754,7 +1376,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
       );
     }
 
-    @view() FlagMenu({className}: {className?: string}) {
+    @view() FlagMenuView({className}: {className?: string}) {
       const theme = useTheme();
 
       return (
@@ -764,7 +1386,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
               label: 'Report as unmaintained',
               onClick: (event) => {
                 event.preventDefault();
-                this.constructor.ReportAsUnmaintained.navigate({
+                this.constructor.ReportAsUnmaintainedPage.navigate({
                   id: this.id,
                   callbackURL: this.getRouter().getCurrentURL()
                 });
@@ -791,218 +1413,6 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
           )}
         </DropdownMenu>
       );
-    }
-
-    @route('/implementations/:id/report-as-unmaintained\\?:callbackURL')
-    @view()
-    static ReportAsUnmaintained({
-      id,
-      callbackURL = this.Home.Main.generateURL()
-    }: {
-      id: string;
-      callbackURL?: string;
-    }) {
-      const {Common} = this;
-
-      return Common.ensureUser(() => {
-        const theme = useTheme();
-        const styles = useStyles();
-
-        const [implementation, , loadingError] = useAsyncMemo(async () => {
-          const implementation = await this.get(id, {
-            repositoryURL: true,
-            libraries: true,
-            unmaintainedIssueNumber: true,
-            markedAsUnmaintainedOn: true
-          });
-
-          if (implementation.unmaintainedIssueNumber !== undefined) {
-            throw Object.assign(new Error('Implementation already reported as unmaintained'), {
-              displayMessage: 'This implementation has already been reported as unmaintained.'
-            });
-          }
-
-          if (implementation.markedAsUnmaintainedOn !== undefined) {
-            throw Object.assign(new Error('Implementation already marked as unmaintained'), {
-              displayMessage: 'This implementation has already been marked as unmaintained.'
-            });
-          }
-
-          return implementation;
-        }, [id]);
-
-        const [issueNumber, setIssueNumber] = useState('');
-
-        const [handleSubmit, isSubmitting, submitError] = useAsyncCallback(async () => {
-          await implementation!.reportAsUnmaintained(Number(issueNumber));
-          this.ReportAsUnmaintainedCompleted.navigate({id: implementation!.id, callbackURL});
-        }, [implementation, issueNumber]);
-
-        if (loadingError !== undefined) {
-          return (
-            <Common.ErrorLayout>
-              <Common.ErrorMessage error={loadingError} />
-            </Common.ErrorLayout>
-          );
-        }
-
-        if (implementation === undefined || isSubmitting) {
-          return <Common.LoadingSpinner />;
-        }
-
-        return (
-          <Common.Dialog title="Report an Implementation as Unmaintained">
-            <a href={implementation.repositoryURL} target="_blank" css={styles.hiddenLink}>
-              <Box css={{padding: '.75rem 1rem', lineHeight: theme.lineHeights.small}}>
-                <div
-                  css={{
-                    fontSize: theme.fontSizes.large,
-                    fontWeight: theme.fontWeights.semibold
-                  }}
-                >
-                  {implementation.formatLibraries()}
-                </div>
-
-                <div
-                  css={{
-                    marginTop: '.3rem',
-                    color: theme.colors.text.muted
-                  }}
-                >
-                  {implementation.formatRepositoryURL()}
-                </div>
-              </Box>
-            </a>
-
-            <p css={{marginTop: '1.5rem'}}>
-              If you think that this implementation is no longer maintained, please post a new issue
-              (or reference an existing issue) in the{' '}
-              <a href={implementation.repositoryURL} target="_blank">
-                implementation repository
-              </a>{' '}
-              with a title such as <strong>"Is this repository still maintained?"</strong> and enter
-              the issue number below.
-            </p>
-
-            <p>
-              If the issue remains <strong>open for a period of 30 days</strong>, the implementation
-              will be automatically marked as unmaintained and it will be removed from the
-              implementation list.
-            </p>
-
-            {submitError && <Common.ErrorBox error={submitError} css={{marginBottom: '1rem'}} />}
-
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                handleSubmit();
-              }}
-              autoComplete="off"
-            >
-              <div css={styles.control}>
-                <label htmlFor="issueNumber" css={styles.label}>
-                  Issue number
-                </label>
-                <Input
-                  id="issueNumber"
-                  value={issueNumber}
-                  onChange={(event) => {
-                    setIssueNumber(event.target.value);
-                  }}
-                  placeholder="123"
-                  required
-                  pattern="[0-9]+"
-                  autoFocus
-                  css={{width: 150}}
-                />
-              </div>
-
-              <Common.ButtonBar>
-                <Button type="submit" color="primary">
-                  Report
-                </Button>
-                <Button
-                  onClick={(event) => {
-                    event.preventDefault();
-                    this.getRouter().navigate(callbackURL);
-                  }}
-                  variant="outline"
-                >
-                  Cancel
-                </Button>
-              </Common.ButtonBar>
-            </form>
-          </Common.Dialog>
-        );
-      });
-    }
-
-    @route('/implementations/:id/report-as-unmaintained/completed\\?:callbackURL')
-    @view()
-    static ReportAsUnmaintainedCompleted({
-      callbackURL = this.Home.Main.generateURL()
-    }: {
-      callbackURL?: string;
-    }) {
-      const {Common} = this;
-
-      return Common.ensureUser(() => {
-        return (
-          <Common.Dialog title={'Thank You!'}>
-            <p>Your report has been recorded.</p>
-            <Common.ButtonBar>
-              <Button
-                onClick={() => {
-                  this.getRouter().navigate(callbackURL);
-                }}
-                color="primary"
-              >
-                Okay
-              </Button>
-            </Common.ButtonBar>
-          </Common.Dialog>
-        );
-      });
-    }
-
-    @route('/implementations/:id/approve-unmaintained-report\\?:token')
-    @view()
-    static ApproveUnmaintainedReport({token}: {token: string}) {
-      const {Home, Common} = this;
-
-      return Common.ensureAdmin(() => {
-        const [isApproving, approvingError] = useAsyncCall(async () => {
-          await this.approveUnmaintainedReport(token);
-        }, [token]);
-
-        if (approvingError !== undefined) {
-          return (
-            <Common.ErrorLayout>
-              <Common.ErrorMessage error={approvingError} />
-            </Common.ErrorLayout>
-          );
-        }
-
-        if (isApproving) {
-          return <Common.LoadingSpinner />;
-        }
-
-        return (
-          <Common.Dialog title={'Unmaintained Implementation Report'} maxWidth={650}>
-            <p>The report has been approved.</p>
-            <Common.ButtonBar>
-              <Button
-                onClick={() => {
-                  Home.Main.navigate();
-                }}
-                color="primary"
-              >
-                Okay
-              </Button>
-            </Common.ButtonBar>
-          </Common.Dialog>
-        );
-      });
     }
 
     formatRepositoryURL() {
@@ -1043,7 +1453,7 @@ function OpenURLButton({url, className}: {url?: string; className?: string}) {
       onClick={
         url
           ? () => {
-              window.open(url, 'realworld-repository-review');
+              window.open(url, 'codebaseshow-repository-review');
             }
           : undefined
       }

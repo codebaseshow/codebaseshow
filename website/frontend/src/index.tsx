@@ -29,9 +29,15 @@ if (!backendURL) {
         theme={{
           colors: {
             primary: {
-              normal: '#ea80fc',
-              highlighted: '#f3a8f0',
-              muted: '#994499',
+              normal: '#54a8ff', // '#ea80fc',
+              highlighted: '#80c3ff', // '#f3a8f0',
+              muted: '#428ed3', // '#994499',
+              textOnNormal: '#000000'
+            },
+            secondary: {
+              normal: '#e64086',
+              highlighted: '#e577a9',
+              muted: '#bc3c77',
               textOnNormal: '#000000'
             }
           },
@@ -39,7 +45,7 @@ if (!backendURL) {
         }}
       >
         <EmotionKit>
-          <Application.Root />
+          <Application.RootView />
         </EmotionKit>
       </EmotionStarter>
     );

@@ -3,6 +3,7 @@ import {attribute, method, index} from '@layr/storable';
 import env from 'env-var';
 
 import type {User} from './user';
+import type {Project} from './project';
 import {Entity} from './entity';
 import {WithOwner} from './with-owner';
 import type {GitHub} from './github';
@@ -13,7 +14,7 @@ const {optional, maxLength, rangeLength, match, anyOf, integer, positive} = vali
 
 const frontendURL = env.get('FRONTEND_URL').required().asUrlString();
 
-const IMPLEMENTATION_CATEGORIES = ['frontend', 'backend', 'fullstack'] as const;
+export const IMPLEMENTATION_CATEGORIES = ['frontend', 'backend', 'fullstack'] as const;
 
 export type ImplementationCategory = typeof IMPLEMENTATION_CATEGORIES[number];
 
@@ -49,9 +50,14 @@ const ADMIN_TOKEN_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 export class Implementation extends WithOwner(Entity) {
   ['constructor']!: typeof Implementation;
 
+  @consume() static Project: typeof Project;
   @consume() static GitHub: typeof GitHub;
   @consume() static Mailer: typeof Mailer;
   @consume() static JWT: typeof JWT;
+
+  @expose({get: true, set: ['owner', 'admin']})
+  @attribute('Project')
+  project!: Project;
 
   @expose({get: true, set: ['owner', 'admin']})
   @attribute('string', {
@@ -180,10 +186,12 @@ export class Implementation extends WithOwner(Entity) {
 
     await this.save();
 
+    await this.project.load({name: true});
+
     try {
       await Mailer.sendMail({
-        subject: 'A new RealWorld implementation has been submitted',
-        text: `A new RealWorld implementation has been submitted:\n\n${frontendURL}implementations/${this.id}/review\n`
+        subject: `A new ${this.project.name} implementation has been submitted`,
+        text: `A new ${this.project.name} implementation has been submitted:\n\n${frontendURL}implementations/${this.id}/review\n`
       });
     } catch (error) {
       console.error(error);
@@ -192,24 +200,30 @@ export class Implementation extends WithOwner(Entity) {
 
   @expose({call: 'admin'}) @method() static async findSubmissionsToReview<
     T extends typeof Implementation
-  >(this: T) {
+  >(this: T, {project}: {project: Project}) {
     const {Session} = this;
 
     return (await this.find(
       {
         $or: [
-          {status: 'pending'},
           {
+            project,
+            status: 'pending'
+          },
+          {
+            project,
             status: 'reviewing',
             reviewer: Session.user
           },
           {
+            project,
             status: 'reviewing',
             reviewStartedOn: {$lessThan: new Date(Date.now() - MAXIMUM_REVIEW_DURATION)}
           }
         ]
       },
       {
+        project: {},
         repositoryURL: true,
         category: true,
         frontendEnvironment: true,
@@ -221,50 +235,37 @@ export class Implementation extends WithOwner(Entity) {
     )) as InstanceType<T>[];
   }
 
-  @expose({call: 'admin'}) @method() static async reviewSubmission<T extends typeof Implementation>(
-    this: T,
-    id: string
-  ) {
-    const {Session} = this;
+  @expose({call: 'admin'}) @method() async reviewSubmission() {
+    const {Session} = this.constructor;
 
-    const implementation = (await this.get(id, {
-      repositoryURL: true,
-      category: true,
-      frontendEnvironment: true,
-      language: true,
-      libraries: true,
-      status: true,
-      reviewer: {},
-      reviewStartedOn: true
-    })) as InstanceType<T>;
+    await this.load({status: true, reviewer: {}, reviewStartedOn: true});
 
-    if (implementation.status === 'reviewing') {
-      const reviewDuration = Date.now() - implementation.reviewStartedOn!.valueOf();
+    if (this.status === 'reviewing') {
+      const reviewDuration = Date.now() - this.reviewStartedOn!.valueOf();
 
-      if (implementation.reviewer !== Session.user && reviewDuration < MAXIMUM_REVIEW_DURATION) {
+      if (this.reviewer !== Session.user && reviewDuration < MAXIMUM_REVIEW_DURATION) {
         throw Object.assign(new Error('Implementation currently reviewed'), {
           displayMessage: 'This submission is currently being reviewed by another administrator.'
         });
       }
-    } else if (implementation.status !== 'pending') {
+    } else if (this.status !== 'pending') {
       throw Object.assign(new Error('Implementation already reviewed'), {
         displayMessage: 'This submission has already been reviewed.'
       });
     }
 
-    implementation.status = 'reviewing';
-    implementation.reviewer = Session.user;
-    implementation.reviewStartedOn = new Date();
+    this.status = 'reviewing';
+    this.reviewer = Session.user;
+    this.reviewStartedOn = new Date();
 
-    await implementation.save();
-
-    return implementation;
+    await this.save();
   }
 
   @expose({call: 'admin'}) @method() async approveSubmission() {
     const {Session, Mailer} = this.constructor;
 
     await this.load({
+      project: {slug: true, name: true},
       repositoryURL: true,
       category: true,
       status: true,
@@ -284,15 +285,15 @@ export class Implementation extends WithOwner(Entity) {
     try {
       await Mailer.sendMail({
         to: this.owner.email,
-        subject: 'Your RealWorld implementation has been approved',
+        subject: `Your ${this.project.name} implementation has been approved`,
         html: `
 <p>Hi, ${this.owner.username},</p>
 
-<p>Your <a href="${this.repositoryURL}">RealWorld implementation</a> has been approved and is now listed on the <a href="${frontendURL}?category=${this.category}">home page</a> of our website.</p>
+<p>Your ${this.project.name} <a href="${this.repositoryURL}">implementation</a> has been approved and is now listed on the <a href="${frontendURL}projects/${this.project.slug}?category=${this.category}">project's home page</a>.</p>
 
 <p>Thanks a lot for your contribution!</p>
 
-<p>--<br>The RealWorld example apps project</p>
+<p>--<br>The CodebaseShow project</p>
 `
       });
     } catch (error) {
@@ -336,7 +337,7 @@ export class Implementation extends WithOwner(Entity) {
 
     await Session.user!.load({username: true});
 
-    await this.load({repositoryURL: true});
+    await this.load({project: {name: true}, repositoryURL: true});
 
     const {owner, name} = parseRepositoryURL(this.repositoryURL);
 
@@ -365,7 +366,7 @@ export class Implementation extends WithOwner(Entity) {
 
     const html = `
 <p>
-The following RealWorld implementation has been reported as unmaintained:
+The following ${this.project.name} implementation has been reported as unmaintained:
 </p>
 
 <p>
@@ -398,7 +399,7 @@ Click the following link to approve the report:
 `;
 
     await Mailer.sendMail({
-      subject: 'A RealWorld implementation has been reported as unmaintained',
+      subject: `A ${this.project.name} implementation has been reported as unmaintained`,
       html
     });
   }

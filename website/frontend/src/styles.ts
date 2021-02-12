@@ -14,6 +14,15 @@ const getStyles = memoize(function getStyles(theme: Theme) {
     hiddenLink: {
       'color': 'inherit',
       ':hover': {color: 'inherit', textDecoration: 'none'}
+    },
+
+    menuItemLink: {
+      'color': theme.colors.primary.normal,
+      'cursor': 'pointer',
+      ':hover': {
+        color: theme.colors.primary.highlighted,
+        textDecoration: 'none'
+      }
     }
   };
 });
