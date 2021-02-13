@@ -125,6 +125,8 @@ const popularLibraries = [
   'Vuex'
 ];
 
+const MAXIMUM_NEW_IMPLEMENTATION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 export const getImplementation = (Base: typeof BackendImplementation) => {
   class Implementation extends Routable(Base) {
     ['constructor']!: typeof Implementation;
@@ -510,7 +512,8 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
             language: true,
             libraries: true,
             numberOfStars: true,
-            markedAsUnmaintainedOn: true
+            markedAsUnmaintainedOn: true,
+            createdAt: true
           },
           {sort: {numberOfStars: 'desc'}}
         );
@@ -611,6 +614,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
                                     >
                                       {implementation.formatLibraries()}
                                     </div>
+
                                     {implementation.frontendEnvironment !== undefined &&
                                       implementation.frontendEnvironment !== 'web' && (
                                         <Badge
@@ -621,6 +625,19 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
                                           {implementation.formatFrontendEnvironment()}
                                         </Badge>
                                       )}
+
+                                    {Date.now() - implementation.createdAt.valueOf() <
+                                      MAXIMUM_NEW_IMPLEMENTATION_DURATION && (
+                                      <Badge
+                                        color="secondary"
+                                        variant="outline"
+                                        title="This project was added less than a month ago"
+                                        css={{marginLeft: '.75rem'}}
+                                      >
+                                        New
+                                      </Badge>
+                                    )}
+
                                     <implementation.FlagMenuView
                                       className="implementation-flag-menu"
                                       css={theme.responsive({
