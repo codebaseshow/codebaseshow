@@ -90,14 +90,19 @@ export class Project extends WithOwner(Entity) {
   static async refreshNumberOfImplementations() {
     const {Implementation} = this;
 
-    const projects = await this.find({}, {});
+    const projects = await this.find({}, {name: true});
 
     for (const project of projects) {
       project.numberOfImplementations = await Implementation.count({
         project,
         isPubliclyListed: true
       });
+
       await project.save();
+
+      console.log(
+        `The project '${project.name}' has been successfully refreshed (number of implementations: '${project.numberOfImplementations}')`
+      );
     }
   }
 }
