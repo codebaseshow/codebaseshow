@@ -36,8 +36,10 @@ export class Application extends Component {
     // Trigger the execution in development mode with:
     // time curl -v -X POST -H "Content-Type: application/json" -d '{"query": {"<=": {"__component": "typeof Application"}, "runDailyTask=>": {"()": []}}}' http://localhost:15542
 
-    const {Implementation} = this;
+    const {Project, Implementation} = this;
 
     await Implementation.checkMaintenanceStatus();
+
+    await Project.refreshNumberOfImplementations();
   }
 }

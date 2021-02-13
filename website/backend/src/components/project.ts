@@ -86,4 +86,18 @@ export class Project extends WithOwner(Entity) {
   @index()
   @attribute('number', {validators: [integer(), positive()]})
   numberOfImplementations!: number;
+
+  static async refreshNumberOfImplementations() {
+    const {Implementation} = this;
+
+    const projects = await this.find({}, {});
+
+    for (const project of projects) {
+      project.numberOfImplementations = await Implementation.count({
+        project,
+        isPubliclyListed: true
+      });
+      await project.save();
+    }
+  }
 }

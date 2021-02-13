@@ -5,8 +5,9 @@ async function main() {
   const store = createStore(Application);
 
   try {
-    await addRealWorldProject();
-    await addTodoMVCProject();
+    // await addRealWorldProject();
+    // await addTodoMVCProject();
+    await refreshNumberOfImplementations();
   } finally {
     await store.disconnect();
   }
@@ -41,7 +42,7 @@ export async function addRealWorldProject() {
     repositoryURL: 'https://github.com/gothinkster/realworld',
     categories: ['frontend', 'backend', 'fullstack'],
     status: 'available',
-    numberOfImplementations: 123
+    numberOfImplementations: 0
   });
 
   await project.save();
@@ -116,6 +117,12 @@ export async function refreshAllGitHubData() {
   const {Implementation} = Application;
 
   await Implementation.refreshGitHubData();
+}
+
+export async function refreshNumberOfImplementations() {
+  const {Project} = Application;
+
+  await Project.refreshNumberOfImplementations();
 }
 
 main().catch((error) => {

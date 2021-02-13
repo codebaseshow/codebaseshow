@@ -1,5 +1,5 @@
 import {consume, expose, validators} from '@layr/component';
-import {attribute, method, index} from '@layr/storable';
+import {attribute, method, index, finder} from '@layr/storable';
 import env from 'env-var';
 
 import type {User} from './user';
@@ -45,7 +45,17 @@ const ADMIN_TOKEN_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
     delete: {call: ['owner', 'admin']}
   }
 })
-@index({category: 'asc', status: 'asc', repositoryStatus: 'asc', numberOfStars: 'desc'})
+@index({
+  project: 'asc',
+  category: 'asc',
+  status: 'asc',
+  repositoryStatus: 'asc',
+  numberOfStars: 'desc'
+})
+@index({
+  project: 'asc',
+  createdAt: 'desc'
+})
 @index({owner: 'asc', createdAt: 'desc'})
 export class Implementation extends WithOwner(Entity) {
   ['constructor']!: typeof Implementation;
@@ -129,6 +139,20 @@ export class Implementation extends WithOwner(Entity) {
   unmaintainedIssueNumber?: number;
 
   @expose({get: true}) @attribute('Date?') markedAsUnmaintainedOn?: Date;
+
+  @expose({get: true})
+  @finder(function (value) {
+    if (value === false) {
+      throw new Error('Unsupported query');
+    }
+
+    return {
+      status: 'approved',
+      repositoryStatus: 'available'
+    };
+  })
+  @attribute('boolean')
+  isPubliclyListed!: boolean;
 
   @expose({call: 'owner'}) @method() async submit() {
     const {Session, GitHub, Mailer} = this.constructor;

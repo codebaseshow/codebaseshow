@@ -503,7 +503,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
 
       const [implementations, , loadingError] = useAsyncMemo(async () => {
         const all = await this.find(
-          {project, category: currentCategory, status: 'approved', repositoryStatus: 'available'},
+          {project, category: currentCategory, isPubliclyListed: true},
           {
             repositoryURL: true,
             frontendEnvironment: true,
