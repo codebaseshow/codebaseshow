@@ -53,6 +53,8 @@ export const getApplication = async ({backendURL}: {backendURL: string}) => {
 
       const theme = useTheme();
 
+      Common.useTitle();
+
       return (
         <>
           <Common.FullHeightView
@@ -174,6 +176,8 @@ export const getApplication = async ({backendURL}: {backendURL: string}) => {
       const {Common} = this;
 
       const theme = useTheme();
+
+      Common.useTitle();
 
       return (
         <Common.FullHeightView css={{display: 'flex', flexDirection: 'column'}}>

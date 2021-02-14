@@ -407,6 +407,8 @@ export const getProject = (Base: typeof BackendProject) => {
 
       const theme = useTheme();
 
+      Common.useTitle(this.name);
+
       return (
         <Common.FullHeightView css={{display: 'flex', flexDirection: 'column'}}>
           <div css={{backgroundColor: theme.colors.background.highlighted}}>

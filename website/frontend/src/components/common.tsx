@@ -5,6 +5,7 @@ import {view, useDelay} from '@layr/react-integration';
 import {jsx, useTheme} from '@emotion/react';
 import {Button} from '@emotion-starter/react';
 import {Stack, Box, ErrorIcon} from '@emotion-kit/react';
+import useMetaTags from 'react-metatags-hook';
 import {useWindowHeight} from '@react-hook/window-size';
 
 import type {Application} from './application';
@@ -55,6 +56,17 @@ export class Common extends Routable(Component) {
     }
 
     return content(Session.user);
+  }
+
+  static useTitle(title?: string) {
+    if (title === undefined) {
+      title =
+        'CodebaseShow — A collection of codebase examples to help you create your next project';
+    } else {
+      title = `CodebaseShow > ${title}`;
+    }
+
+    useMetaTags({title}, [title]);
   }
 
   @view() static FullHeightView({
