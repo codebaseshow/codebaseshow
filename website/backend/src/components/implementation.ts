@@ -102,6 +102,7 @@ export class Implementation extends WithOwner(Entity) {
   language!: string;
 
   @expose({get: true, set: ['owner', 'admin']})
+  @index()
   @attribute('string[]', {
     validators: [rangeLength([1, 5])],
     items: {validators: [rangeLength([1, 50])]}
@@ -521,6 +522,19 @@ Click the following link to approve the report:
     console.log(
       `The unmaintained issue '${issue.url}' has been successfully checked (id: '${this.id}')`
     );
+  }
+
+  @expose({call: true}) @method() static async findUsedLibraries() {
+    // TODO: Don't use store's internals
+    const store = this.getStore();
+    const collection = await (store as any)._getCollection('Implementation');
+    const usedLibraries = (await collection.distinct('libraries')) as string[];
+
+    // Strangely, `collection.distinct()` returns an `undefined` entry in case there
+    // is an empty array of libraries and the libraries field is indexed
+    const usedLibrariesWithoutUndefined = usedLibraries.filter((library) => library !== undefined);
+
+    return usedLibrariesWithoutUndefined;
   }
 
   static async refreshGitHubData({limit}: {limit?: number} = {}) {

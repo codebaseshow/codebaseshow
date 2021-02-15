@@ -1124,6 +1124,28 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
 
       const styles = useStyles();
 
+      const [allLibraries, isFindingAllLibraries, findAllLibrariesError] = useAsyncMemo(
+        async () => {
+          let allLibraries = [...popularLibraries];
+
+          const usedLibraries = await this.constructor.findUsedLibraries();
+
+          for (const usedLibrary of usedLibraries) {
+            const usedLibraryLowercase = usedLibrary.toLocaleLowerCase();
+
+            if (
+              !allLibraries.some((library) => library.toLocaleLowerCase() === usedLibraryLowercase)
+            ) {
+              allLibraries.push(usedLibrary);
+            }
+          }
+
+          allLibraries = sortBy(allLibraries, (library) => library.toLocaleLowerCase());
+
+          return allLibraries;
+        }
+      );
+
       const cleanAttributes = useCallback(() => {
         this.repositoryURL = this.repositoryURL.trim();
         this.language = this.language.trim();
@@ -1160,9 +1182,22 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
       });
 
       const isBusy =
-        isSubmitting || isSaving || isDeleting || isApproving || isRejecting || isCanceling;
+        isFindingAllLibraries ||
+        isSubmitting ||
+        isSaving ||
+        isDeleting ||
+        isApproving ||
+        isRejecting ||
+        isCanceling;
+
       const error =
-        submitError || saveError || deleteError || approveError || rejectError || cancelError;
+        findAllLibrariesError ||
+        submitError ||
+        saveError ||
+        deleteError ||
+        approveError ||
+        rejectError ||
+        cancelError;
 
       if (isBusy) {
         return <Common.LoadingSpinnerView />;
@@ -1305,7 +1340,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
                   {this.libraries.map((_, index) => (
                     <ComboBox
                       key={index}
-                      items={popularLibraries}
+                      items={allLibraries}
                       initialValue={this.libraries[index]}
                       onValueChange={(value) => {
                         this.libraries[index] = value;
