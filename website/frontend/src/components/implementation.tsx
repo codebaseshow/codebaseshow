@@ -530,6 +530,81 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
       });
     }
 
+    @route('/implementations/:id/claim-ownership\\?:callbackURL')
+    @view()
+    static ClaimOwnershipPage({id, callbackURL}: {id: string; callbackURL?: string}) {
+      const {Project, Common} = this;
+
+      return Common.ensureUser(() => {
+        const [implementation, , loadingError] = useAsyncMemo(async () => {
+          return await this.get(id, {
+            project: {slug: true},
+            repositoryURL: true,
+            libraries: true
+          });
+        }, [id]);
+
+        const [handleClaim, isClaiming, claimError] = useAsyncCallback(async () => {
+          await implementation!.claimOwnership();
+          this.getRouter().navigate(callbackURL!);
+        }, [implementation, callbackURL]);
+
+        if (loadingError !== undefined) {
+          return (
+            <Common.ErrorLayoutView>
+              <Common.ErrorMessageView error={loadingError} />
+            </Common.ErrorLayoutView>
+          );
+        }
+
+        if (implementation === undefined || isClaiming) {
+          return <Common.LoadingSpinnerView />;
+        }
+
+        callbackURL ??= Project.HomePage.generateURL(implementation.project);
+
+        return (
+          <Project.LoaderView slug={implementation.project.slug}>
+            {() => (
+              <Common.DialogView title="Claim Ownership of an Implementation">
+                <implementation.Summary />
+
+                <p>
+                  If you are the maintainer of this implementation, you can claim its ownership and
+                  get the permission to edit it, delete it, etc.
+                </p>
+
+                {claimError && (
+                  <Common.ErrorBoxView error={claimError} css={{marginBottom: '1rem'}} />
+                )}
+
+                <Common.ButtonBarView>
+                  <Button
+                    onClick={(event) => {
+                      event.preventDefault();
+                      handleClaim();
+                    }}
+                    color="primary"
+                  >
+                    Claim ownership
+                  </Button>
+                  <Button
+                    onClick={(event) => {
+                      event.preventDefault();
+                      this.getRouter().navigate(callbackURL!);
+                    }}
+                    variant="outline"
+                  >
+                    Cancel
+                  </Button>
+                </Common.ButtonBarView>
+              </Common.DialogView>
+            )}
+          </Project.LoaderView>
+        );
+      });
+    }
+
     @view() Summary() {
       const theme = useTheme();
       const styles = useStyles();
@@ -1542,7 +1617,17 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
                       callbackURL: this.getRouter().getCurrentURL()
                     });
                   }
-                }
+                },
+            !isOwnedBySessionUser && {
+              label: 'Claim ownership',
+              onClick: (event) => {
+                event.preventDefault();
+                this.constructor.ClaimOwnershipPage.navigate({
+                  id: this.id,
+                  callbackURL: this.getRouter().getCurrentURL()
+                });
+              }
+            }
           ]}
         >
           {({open}) => (

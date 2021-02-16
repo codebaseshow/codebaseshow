@@ -456,7 +456,7 @@ Click the following link to approve the report:
     await implementation.checkMaintenanceStatus();
   }
 
-  @expose({call: 'owner'}) @method() async markAsUnmaintained() {
+  @expose({call: ['owner', 'admin']}) @method() async markAsUnmaintained() {
     const {Session, Mailer} = this.constructor;
 
     await Session.user!.load({username: true});
@@ -495,6 +495,88 @@ Owner:
 
     await Mailer.sendMail({
       subject: `A ${this.project.name} implementation has been marked as unmaintained by its owner`,
+      html
+    });
+  }
+
+  @expose({call: 'user'}) @method() async claimOwnership() {
+    const {Session, Mailer, GitHub} = this.constructor;
+
+    await Session.user!.load({username: true, githubId: true});
+
+    await this.load({
+      project: {name: true},
+      repositoryURL: true,
+      owner: {username: true, isAdmin: true}
+    });
+
+    if (!this.owner.isAdmin) {
+      throw Object.assign(new Error(`Implementation not owned by an admin`), {
+        displayMessage:
+          'Sorry but for now only implementations that have been added by a CodebaseShow administrator can be claimed.'
+      });
+    }
+
+    const {owner, name} = parseRepositoryURL(this.repositoryURL);
+
+    const {ownerId} = await GitHub.fetchRepository({owner, name});
+
+    const userId = Session.user!.githubId;
+
+    if (ownerId !== userId) {
+      const contributor = await GitHub.findRepositoryContributor({owner, name, userId});
+
+      if (contributor === undefined) {
+        throw Object.assign(new Error(`User is not a maintainer`), {
+          displayMessage:
+            'Sorry but it was not possible to verify that you are the maintainer of this implementation.'
+        });
+      }
+    }
+
+    const previousOwner = this.owner;
+
+    this.owner = Session.user!;
+    await this.save();
+
+    console.log(
+      `The ownership of the implementation '${this.repositoryURL}' has been claimed (id: '${this.id}')`
+    );
+
+    const implementationURL = `${frontendURL}implementations/${this.id}/edit`;
+
+    const previousOwnerURL = `https://github.com/${previousOwner.username}`;
+
+    const newOwnerURL = `https://github.com/${Session.user!.username}`;
+
+    const html = `
+<p>
+The ownership of the following ${this.project.name} implementation has been claimed:
+</p>
+
+<p>
+<a href="${implementationURL}">${implementationURL}</a>
+</p>
+
+<p>
+Previous owner:
+</p>
+
+<p>
+<a href="${previousOwnerURL}">${previousOwnerURL}</a>
+</p>
+
+<p>
+New owner:
+</p>
+
+<p>
+<a href="${newOwnerURL}">${newOwnerURL}</a>
+</p>
+`;
+
+    await Mailer.sendMail({
+      subject: `The ownership of a ${this.project.name} implementation has been claimed`,
       html
     });
   }
