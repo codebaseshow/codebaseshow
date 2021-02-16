@@ -456,6 +456,49 @@ Click the following link to approve the report:
     await implementation.checkMaintenanceStatus();
   }
 
+  @expose({call: 'owner'}) @method() async markAsUnmaintained() {
+    const {Session, Mailer} = this.constructor;
+
+    await Session.user!.load({username: true});
+
+    await this.load({project: {name: true}, repositoryURL: true});
+
+    this.unmaintainedIssueNumber = undefined;
+    this.markedAsUnmaintainedOn = new Date();
+    await this.save();
+
+    console.log(
+      `The implementation '${this.repositoryURL}' has been marked as unmaintained by its owner (id: '${this.id}')`
+    );
+
+    const implementationURL = `${frontendURL}implementations/${this.id}/edit`;
+
+    const userURL = `https://github.com/${Session.user!.username}`;
+
+    const html = `
+<p>
+The following ${this.project.name} implementation has been mark as unmaintained by its owner:
+</p>
+
+<p>
+<a href="${implementationURL}">${implementationURL}</a>
+</p>
+
+<p>
+Owner:
+</p>
+
+<p>
+<a href="${userURL}">${userURL}</a>
+</p>
+`;
+
+    await Mailer.sendMail({
+      subject: `A ${this.project.name} implementation has been marked as unmaintained by its owner`,
+      html
+    });
+  }
+
   static async checkMaintenanceStatus() {
     const implementations = await this.find(
       {unmaintainedIssueNumber: {$notEqual: undefined}},

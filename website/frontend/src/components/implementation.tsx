@@ -254,7 +254,6 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
       const {Project, Common} = this;
 
       return Common.ensureUser(() => {
-        const theme = useTheme();
         const styles = useStyles();
 
         const [implementation, , loadingError] = useAsyncMemo(async () => {
@@ -306,27 +305,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
           <Project.LoaderView slug={implementation.project.slug}>
             {() => (
               <Common.DialogView title="Report an Implementation as Unmaintained">
-                <a href={implementation.repositoryURL} target="_blank" css={styles.hiddenLink}>
-                  <Box css={{padding: '.75rem 1rem', lineHeight: theme.lineHeights.small}}>
-                    <div
-                      css={{
-                        fontSize: theme.fontSizes.large,
-                        fontWeight: theme.fontWeights.semibold
-                      }}
-                    >
-                      {implementation.formatLibraries()}
-                    </div>
-
-                    <div
-                      css={{
-                        marginTop: '.3rem',
-                        color: theme.colors.text.muted
-                      }}
-                    >
-                      {implementation.formatRepositoryURL()}
-                    </div>
-                  </Box>
-                </a>
+                <implementation.Summary />
 
                 <p css={{marginTop: '1.5rem'}}>
                   If you think that this implementation is no longer maintained, please post a new
@@ -487,6 +466,107 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
       });
     }
 
+    @route('/implementations/:id/mark-as-unmaintained\\?:callbackURL')
+    @view()
+    static MarkAsUnmaintainedPage({id, callbackURL}: {id: string; callbackURL?: string}) {
+      const {Project, Common} = this;
+
+      return Common.ensureUser(() => {
+        const [implementation, , loadingError] = useAsyncMemo(async () => {
+          return await this.get(id, {
+            project: {slug: true},
+            repositoryURL: true,
+            libraries: true
+          });
+        }, [id]);
+
+        const [handleMark, isMarking, markError] = useAsyncCallback(async () => {
+          await implementation!.markAsUnmaintained();
+          this.getRouter().navigate(callbackURL!);
+        }, [implementation, callbackURL]);
+
+        if (loadingError !== undefined) {
+          return (
+            <Common.ErrorLayoutView>
+              <Common.ErrorMessageView error={loadingError} />
+            </Common.ErrorLayoutView>
+          );
+        }
+
+        if (implementation === undefined || isMarking) {
+          return <Common.LoadingSpinnerView />;
+        }
+
+        callbackURL ??= Project.HomePage.generateURL(implementation.project);
+
+        return (
+          <Project.LoaderView slug={implementation.project.slug}>
+            {() => (
+              <Common.DialogView title="Mark an Implementation as Unmaintained">
+                <implementation.Summary />
+
+                <p>Do you really want to mark this implementation as unmaintained?</p>
+
+                {markError && (
+                  <Common.ErrorBoxView error={markError} css={{marginBottom: '1rem'}} />
+                )}
+
+                <Common.ButtonBarView>
+                  <Button
+                    onClick={(event) => {
+                      event.preventDefault();
+                      handleMark();
+                    }}
+                    color="primary"
+                  >
+                    Mark as unmaintained
+                  </Button>
+                  <Button
+                    onClick={(event) => {
+                      event.preventDefault();
+                      this.getRouter().navigate(callbackURL!);
+                    }}
+                    variant="outline"
+                  >
+                    Cancel
+                  </Button>
+                </Common.ButtonBarView>
+              </Common.DialogView>
+            )}
+          </Project.LoaderView>
+        );
+      });
+    }
+
+    @view() Summary() {
+      const theme = useTheme();
+      const styles = useStyles();
+
+      return (
+        <a href={this.repositoryURL} target="_blank" css={styles.hiddenLink}>
+          <Box css={{padding: '.75rem 1rem', lineHeight: theme.lineHeights.small}}>
+            <div
+              css={{
+                fontSize: theme.fontSizes.large,
+                fontWeight: theme.fontWeights.semibold
+              }}
+            >
+              {this.formatLibraries()}
+            </div>
+
+            <div
+              css={{
+                marginTop: '.3rem',
+                color: theme.colors.text.muted
+              }}
+            >
+              {this.formatRepositoryURL()}
+            </div>
+          </Box>
+        </a>
+      );
+    }
+
     @view() static ListView({
       project,
       category: currentCategory = 'frontend',
@@ -513,6 +593,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
             libraries: true,
             numberOfStars: true,
             markedAsUnmaintainedOn: true,
+            owner: {},
             createdAt: true
           },
           {sort: {numberOfStars: 'desc'}}
@@ -1429,21 +1510,36 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
     }
 
     @view() FlagMenuView({className}: {className?: string}) {
+      const {Session} = this.constructor;
+
       const theme = useTheme();
+
+      const isOwnedBySessionUser = this.owner === Session.user;
 
       return (
         <DropdownMenu
           items={[
-            {
-              label: 'Report as unmaintained',
-              onClick: (event) => {
-                event.preventDefault();
-                this.constructor.ReportAsUnmaintainedPage.navigate({
-                  id: this.id,
-                  callbackURL: this.getRouter().getCurrentURL()
-                });
-              }
-            }
+            !isOwnedBySessionUser
+              ? {
+                  label: 'Report as unmaintained',
+                  onClick: (event) => {
+                    event.preventDefault();
+                    this.constructor.ReportAsUnmaintainedPage.navigate({
+                      id: this.id,
+                      callbackURL: this.getRouter().getCurrentURL()
+                    });
+                  }
+                }
+              : {
+                  label: 'Mark as unmaintained',
+                  onClick: (event) => {
+                    event.preventDefault();
+                    this.constructor.MarkAsUnmaintainedPage.navigate({
+                      id: this.id,
+                      callbackURL: this.getRouter().getCurrentURL()
+                    });
+                  }
+                }
           ]}
         >
           {({open}) => (
