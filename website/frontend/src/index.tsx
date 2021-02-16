@@ -27,20 +27,6 @@ if (!backendURL) {
       <EmotionStarter
         mode={'dark'}
         theme={{
-          colors: {
-            primary: {
-              normal: '#54a8ff', // '#ea80fc',
-              highlighted: '#80c3ff', // '#f3a8f0',
-              muted: '#428ed3', // '#994499',
-              textOnNormal: '#000000'
-            },
-            secondary: {
-              normal: '#e64086',
-              highlighted: '#e577a9',
-              muted: '#bc3c77',
-              textOnNormal: '#000000'
-            }
-          },
           fontFamilies: {body: "'Open Sans', sans-serif", heading: "'Open Sans', sans-serif"}
         }}
       >
