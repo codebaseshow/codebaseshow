@@ -4,16 +4,7 @@ import {Fragment, useState, useCallback} from 'react';
 import {view, useAsyncCallback, useAsyncMemo} from '@layr/react-integration';
 import {jsx, useTheme} from '@emotion/react';
 import {Input, Select, Button} from '@emotion-starter/react';
-import {
-  Stack,
-  Box,
-  Badge,
-  ComboBox,
-  DropdownMenu,
-  StarIcon,
-  FlagIcon,
-  LaunchIcon
-} from '@emotion-kit/react';
+import {Stack, Box, Badge, ComboBox, DropdownMenu, StarIcon, LaunchIcon} from '@emotion-kit/react';
 import compact from 'lodash/compact';
 import {formatDistanceToNowStrict} from 'date-fns';
 import numeral from 'numeral';
@@ -28,6 +19,7 @@ import type {
 import type {User} from './user';
 import type {Project} from './project';
 import type {Common} from './common';
+import {MoreIcon} from '../icons';
 import {useStyles} from '../styles';
 
 export const implementationCategories = {
@@ -672,7 +664,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
                                   'flexWrap': 'wrap',
                                   'alignItems': 'center',
                                   ':hover': {
-                                    '.implementation-flag-menu': {
+                                    '.implementation-menu': {
                                       opacity: 1
                                     }
                                   }
@@ -719,8 +711,8 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
                                       </Badge>
                                     )}
 
-                                    <implementation.FlagMenuView
-                                      className="implementation-flag-menu"
+                                    <implementation.MenuView
+                                      className="implementation-menu"
                                       css={theme.responsive({
                                         display: ['block', , , 'none'],
                                         marginLeft: '.5rem',
@@ -1509,17 +1501,28 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
       );
     }
 
-    @view() FlagMenuView({className}: {className?: string}) {
+    @view() MenuView({className}: {className?: string}) {
       const {Session} = this.constructor;
 
       const theme = useTheme();
 
       const isOwnedBySessionUser = this.owner === Session.user;
+      const isAdmin = Session.user?.isAdmin;
 
       return (
         <DropdownMenu
           items={[
-            !isOwnedBySessionUser
+            (isOwnedBySessionUser || isAdmin) && {
+              label: 'Edit',
+              onClick: (event) => {
+                event.preventDefault();
+                this.constructor.EditPage.navigate({
+                  id: this.id,
+                  callbackURL: this.getRouter().getCurrentURL()
+                });
+              }
+            },
+            !(isOwnedBySessionUser || isAdmin)
               ? {
                   label: 'Report as unmaintained',
                   onClick: (event) => {
@@ -1550,7 +1553,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
               }}
               className={className}
             >
-              <FlagIcon
+              <MoreIcon
                 size={20}
                 css={{
                   'color': theme.colors.text.moreMuted,
