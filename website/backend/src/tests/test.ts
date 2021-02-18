@@ -8,6 +8,8 @@ async function main() {
     // await addRealWorldProject();
     // await addTodoMVCProject();
     await refreshNumberOfImplementations();
+    // await generateImplementationLibrariesSortKeys();
+    // await setTodoMVCImplementationCreatedAt();
   } finally {
     await store.disconnect();
   }
@@ -65,27 +67,53 @@ export async function addTodoMVCProject() {
     slug: 'todomvc',
     name: 'TodoMVC',
     description: 'A to-do application implemented using MV* concepts.',
-    headline: 'Headline',
-    subheading: 'Subheading.',
+    headline: 'Helping you select an MV* framework',
+    subheading: 'See how the same to-do application is implemented using different MV* frameworks.',
     logo: {
       normalURL: '/todomvc-logo-dark-mode-20200207.immutable.svg',
       narrowURL: '/todomvc-logo-dark-mode-20200207.immutable.svg',
       height: 25
     },
     screenshot: {
-      normalURL: '/todomvc-screenshot-00000000.immutable.png',
-      height: 175
+      normalURL: '/todomvc-screenshot-20210217.immutable.png',
+      height: 225
     },
     websiteURL: 'https://todomvc.com/',
     createURL: 'https://github.com/tastejs/todomvc/blob/master/contributing.md',
-    demoURL: 'https://todomvc.com/examples/emberjs/',
+    demoURL: 'https://todomvc.com/examples/backbone/',
     repositoryURL: 'https://github.com/tastejs/todomvc',
-    categories: ['frontend'],
+    categories: ['frontend', 'fullstack'],
     status: 'coming-soon',
     numberOfImplementations: 0
   });
 
   await project.save();
+}
+
+export async function generateImplementationLibrariesSortKeys() {
+  const {Implementation} = Application;
+
+  const implementations = await Implementation.find({}, {repositoryURL: true, libraries: true});
+
+  for (const implementation of implementations) {
+    implementation.getAttribute('libraries').setValueSource(0);
+    await implementation.save();
+    console.log(`Implementation '${implementation.repositoryURL}' updated`);
+  }
+}
+
+export async function setTodoMVCImplementationCreatedAt() {
+  const {Project, Implementation} = Application;
+
+  const project = await Project.get({slug: 'todomvc'});
+
+  const implementations = await Implementation.find({project}, {repositoryURL: true});
+
+  for (const implementation of implementations) {
+    implementation.createdAt = new Date('2021-01-01');
+    await implementation.save();
+    console.log(`Implementation '${implementation.repositoryURL}' updated`);
+  }
 }
 
 export async function checkAllImplementationMaintenanceStatus() {

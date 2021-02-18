@@ -1,4 +1,4 @@
-import {consume, expose, validators} from '@layr/component';
+import {consume, expose, validators, AttributeSelector} from '@layr/component';
 import {attribute, method, index, finder} from '@layr/storable';
 import env from 'env-var';
 
@@ -50,7 +50,8 @@ const ADMIN_TOKEN_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
   category: 'asc',
   status: 'asc',
   repositoryStatus: 'asc',
-  numberOfStars: 'desc'
+  numberOfStars: 'desc',
+  librariesSortKey: 'asc'
 })
 @index({
   project: 'asc',
@@ -109,6 +110,8 @@ export class Implementation extends WithOwner(Entity) {
   })
   libraries!: string[];
 
+  @expose({get: true}) @attribute('string') librariesSortKey = '';
+
   @expose({get: ['owner', 'admin']})
   @index()
   @attribute('string', {
@@ -124,8 +127,8 @@ export class Implementation extends WithOwner(Entity) {
 
   @expose({get: true})
   @index()
-  @attribute('number', {validators: [integer(), positive()]})
-  numberOfStars = 0;
+  @attribute('number?', {validators: [optional([integer(), positive()])]})
+  numberOfStars?: number;
 
   @expose({get: true})
   @attribute('number?', {validators: [optional([integer(), positive()])]})
@@ -155,6 +158,16 @@ export class Implementation extends WithOwner(Entity) {
   @attribute('boolean')
   isPubliclyListed!: boolean;
 
+  async beforeSave(attributeSelector: AttributeSelector) {
+    await super.beforeSave(attributeSelector);
+
+    if (this.getAttribute('libraries').isSet()) {
+      this.librariesSortKey = this.libraries
+        .map((library) => library.toLocaleLowerCase())
+        .join(',');
+    }
+  }
+
   @expose({call: 'owner'}) @method() async submit() {
     const {Session, GitHub, Mailer} = this.constructor;
 
@@ -168,7 +181,7 @@ export class Implementation extends WithOwner(Entity) {
       });
     }
 
-    const {owner, name} = parseRepositoryURL(this.repositoryURL);
+    const {owner, name, isRoot} = parseRepositoryURL(this.repositoryURL);
 
     const {
       ownerId,
@@ -205,7 +218,7 @@ export class Implementation extends WithOwner(Entity) {
       });
     }
 
-    this.numberOfStars = numberOfStars;
+    this.numberOfStars = isRoot ? numberOfStars : undefined;
     this.githubData = githubData;
     this.githubDataFetchedOn = new Date();
 
@@ -221,6 +234,28 @@ export class Implementation extends WithOwner(Entity) {
     } catch (error) {
       console.error(error);
     }
+  }
+
+  @expose({call: 'admin'}) @method() async add() {
+    const {GitHub} = this.constructor;
+
+    if (!this.isNew()) {
+      throw new Error('Cannot add a non-new implementation');
+    }
+
+    const {owner, name, isRoot} = parseRepositoryURL(this.repositoryURL);
+
+    const {numberOfStars, githubData} = await GitHub.fetchRepository({
+      owner,
+      name
+    });
+
+    this.status = 'approved';
+    this.numberOfStars = isRoot ? numberOfStars : undefined;
+    this.githubData = githubData;
+    this.githubDataFetchedOn = new Date();
+
+    await this.save();
   }
 
   @expose({call: 'admin'}) @method() static async findSubmissionsToReview<
@@ -680,14 +715,14 @@ New owner:
     await this.load({repositoryURL: true});
 
     try {
-      const {owner, name} = parseRepositoryURL(this.repositoryURL);
+      const {owner, name, isRoot} = parseRepositoryURL(this.repositoryURL);
 
       const {numberOfStars, isArchived, hasIssues, githubData} = await GitHub.fetchRepository({
         owner,
         name
       });
 
-      this.numberOfStars = numberOfStars;
+      this.numberOfStars = isRoot ? numberOfStars : undefined;
       this.githubData = githubData;
 
       if (isArchived) {
@@ -724,7 +759,11 @@ function parseRepositoryURL(url: string) {
     });
   }
 
-  const matches = url.match(/^https\:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)/);
+  if (url.endsWith('/')) {
+    url = url.slice(0, -1);
+  }
+
+  const matches = url.match(/^https\:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(.+)?$/);
 
   if (matches === null) {
     throw Object.assign(new Error('Invalid repository URL'), {
@@ -732,7 +771,7 @@ function parseRepositoryURL(url: string) {
     });
   }
 
-  const [, owner, name] = matches;
+  const [, owner, name, rest] = matches;
 
-  return {owner, name};
+  return {owner, name, isRoot: rest === undefined};
 }

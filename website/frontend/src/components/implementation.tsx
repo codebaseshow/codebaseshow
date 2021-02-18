@@ -663,7 +663,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
             owner: {},
             createdAt: true
           },
-          {sort: {numberOfStars: 'desc'}}
+          {sort: {numberOfStars: 'desc', librariesSortKey: 'asc'}}
         );
 
         const [active, unmaintained] = partition(
@@ -692,7 +692,11 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
 
       return (
         <div className={className}>
-          <this.CategoryFilterView project={project} currentCategory={currentCategory} />
+          {project.categories.length > 1 ? (
+            <this.CategoryFilterView project={project} currentCategory={currentCategory} />
+          ) : (
+            <div css={{borderBottom: `1px solid ${theme.colors.border.normal}`}} />
+          )}
 
           {implementations === undefined && (
             <div css={{marginBottom: 2000}}>
@@ -740,7 +744,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
                                   'alignItems': 'center',
                                   ':hover': {
                                     '.implementation-menu': {
-                                      opacity: 1
+                                      visibility: 'visible'
                                     }
                                   }
                                 }}
@@ -791,7 +795,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
                                       css={theme.responsive({
                                         display: ['block', , , 'none'],
                                         marginLeft: '.5rem',
-                                        opacity: 0
+                                        visibility: 'hidden'
                                       })}
                                     />
                                   </div>
@@ -815,7 +819,11 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
                                     width: '90px',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    lineHeight: 1
+                                    lineHeight: 1,
+                                    visibility:
+                                      implementation.numberOfStars !== undefined
+                                        ? 'visible'
+                                        : 'hidden'
                                   }}
                                 >
                                   <StarIcon
@@ -1057,7 +1065,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
     }
 
     @view() static EditListView({project}: {project: Project}) {
-      const {Common} = this;
+      const {Project, Common} = this;
 
       const [implementations] = useAsyncMemo(async () => {
         return await this.find(
@@ -1116,6 +1124,18 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
           {implementations.length === 0 && (
             <Box css={{marginTop: '2rem', padding: '1rem'}}>There are no implementations.</Box>
           )}
+
+          <Common.ButtonBarView>
+            <Button
+              onClick={(event) => {
+                event.preventDefault();
+                Project.AddImplementationPage.navigate(project);
+              }}
+              color="primary"
+            >
+              Add
+            </Button>
+          </Common.ButtonBarView>
         </div>
       );
     }
@@ -1254,6 +1274,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
     @view() FormView({
       title,
       onSubmit,
+      onAdd,
       onSave,
       onDelete,
       onApprove,
@@ -1262,6 +1283,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
     }: {
       title: string;
       onSubmit?: () => Promise<any>;
+      onAdd?: () => Promise<any>;
       onSave?: () => Promise<void>;
       onDelete?: () => Promise<void>;
       onApprove?: () => Promise<void>;
@@ -1305,6 +1327,11 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
         await onSubmit!();
       });
 
+      const [handleAdd, isAdding, addError] = useAsyncCallback(async () => {
+        cleanAttributes();
+        await onAdd!();
+      });
+
       const [handleSave, isSaving, saveError] = useAsyncCallback(async () => {
         cleanAttributes();
         await onSave!();
@@ -1332,6 +1359,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
       const isBusy =
         isFindingAllLibraries ||
         isSubmitting ||
+        isAdding ||
         isSaving ||
         isDeleting ||
         isApproving ||
@@ -1341,6 +1369,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
       const error =
         findAllLibrariesError ||
         submitError ||
+        addError ||
         saveError ||
         deleteError ||
         approveError ||
@@ -1370,12 +1399,14 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
         <Common.DialogView title={title}>
           <form
             onSubmit={
-              onSubmit || onSave
+              onSubmit || onAdd || onSave
                 ? (event) => {
                     event.preventDefault();
 
                     if (onSubmit) {
                       handleSubmit();
+                    } else if (onAdd) {
+                      handleAdd();
                     } else if (onSave) {
                       handleSave();
                     }
@@ -1505,6 +1536,12 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
               {onSubmit && (
                 <Button type="submit" color="primary">
                   Submit
+                </Button>
+              )}
+
+              {onAdd && (
+                <Button type="submit" color="primary">
+                  Add
                 </Button>
               )}
 

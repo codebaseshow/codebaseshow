@@ -56,29 +56,25 @@ export const getProject = (Base: typeof BackendProject) => {
         <this.LoaderView slug={slug}>
           {(project) => (
             <div css={{margin: '.5rem 0 1rem 0'}}>
-              {category === undefined && language === undefined && (
-                <div css={{textAlign: 'center', marginBottom: '3.3rem'}}>
-                  <a href={project.demoURL} target="_blank">
-                    <img
-                      src={project.screenshot.normalURL}
-                      alt="Screenshot"
-                      css={{height: project.screenshot.height}}
-                    />
-                  </a>
-                  <h2 css={theme.responsive({fontSize: ['250%', , , '200%']})}>
-                    {project.headline}
-                  </h2>
-                  <p
-                    css={{
-                      fontSize: theme.fontSizes.large,
-                      color: theme.colors.text.muted,
-                      lineHeight: theme.lineHeights.small
-                    }}
-                  >
-                    {project.subheading}
-                  </p>
-                </div>
-              )}
+              <div css={{textAlign: 'center', marginBottom: '3.3rem'}}>
+                <a href={project.demoURL} target="_blank">
+                  <img
+                    src={project.screenshot.normalURL}
+                    alt="Screenshot"
+                    css={{height: project.screenshot.height}}
+                  />
+                </a>
+                <h2 css={theme.responsive({fontSize: ['250%', , , '200%']})}>{project.headline}</h2>
+                <p
+                  css={{
+                    fontSize: theme.fontSizes.large,
+                    color: theme.colors.text.muted,
+                    lineHeight: theme.lineHeights.small
+                  }}
+                >
+                  {project.subheading}
+                </p>
+              </div>
 
               <Implementation.ListView
                 project={project}
@@ -184,6 +180,56 @@ export const getProject = (Base: typeof BackendProject) => {
           </this.LoaderView>
         );
       });
+    }
+
+    @route('/projects/:slug/implementations/add') @view() static AddImplementationPage({
+      slug
+    }: {
+      slug: string;
+    }) {
+      const {Common} = this;
+
+      return Common.ensureAdmin(() => {
+        return (
+          <this.LoaderView slug={slug}>
+            {(project) => <project.AddImplementationView />}
+          </this.LoaderView>
+        );
+      });
+    }
+
+    @view() AddImplementationView() {
+      const {Implementation} = this.constructor;
+
+      const implementation = useMemo(
+        () =>
+          Implementation.create(
+            {
+              project: this,
+              repositoryURL: '',
+              frontendEnvironment: undefined,
+              language: '',
+              libraries: ['']
+            },
+            {attributeSelector: {id: true}}
+          ),
+        []
+      );
+
+      const [handleAdd] = useAsyncCallback(async () => {
+        await implementation.add();
+        this.constructor.EditImplementationsPage.navigate(this);
+      });
+
+      return (
+        <implementation.FormView
+          title="Add an Implementation"
+          onAdd={handleAdd}
+          onCancel={async () => {
+            this.constructor.EditImplementationsPage.navigate(this);
+          }}
+        />
+      );
     }
 
     @route('/projects/:slug/implementations') @view() static EditImplementationsPage({
