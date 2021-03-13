@@ -76,7 +76,7 @@ export async function addTodoMVCProject() {
     },
     screenshot: {
       normalURL: '/todomvc-screenshot-20210217.immutable.png',
-      height: 225
+      height: 200
     },
     websiteURL: 'https://todomvc.com/',
     createURL: 'https://github.com/tastejs/todomvc/blob/master/contributing.md',

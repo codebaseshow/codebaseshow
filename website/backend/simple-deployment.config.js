@@ -26,7 +26,7 @@ module.exports = () => {
       lambda: {
         executionRole: 'codebaseshow-website-backend-prod',
         memorySize: 1024,
-        timeout: 25
+        timeout: 15 * 60 // 15 minutes
       }
     }
   };
