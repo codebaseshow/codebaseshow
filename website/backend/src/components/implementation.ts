@@ -1,6 +1,7 @@
 import {consume, expose, validators, AttributeSelector} from '@layr/component';
 import {attribute, method, index, finder} from '@layr/storable';
 import env from 'env-var';
+import escape from 'lodash/escape';
 
 import type {User} from './user';
 import type {Project} from './project';
@@ -361,10 +362,20 @@ export class Implementation extends WithOwner(Entity) {
     }
   }
 
-  @expose({call: 'admin'}) @method() async rejectSubmission() {
-    const {Session} = this.constructor;
+  @expose({call: 'admin'}) @method() async rejectSubmission({rejectionReason = ''} = {}) {
+    // Rejection reason examples:
+    // - This implementation seems to be a work in progress
 
-    await this.load({status: true, reviewer: {}});
+    const {Session, Mailer} = this.constructor;
+
+    await this.load({
+      project: {slug: true, name: true},
+      repositoryURL: true,
+      category: true,
+      status: true,
+      owner: {username: true, email: true},
+      reviewer: {}
+    });
 
     if (this.status !== 'reviewing' || this.reviewer !== Session.user) {
       throw new Error('Rejection error');
@@ -374,6 +385,28 @@ export class Implementation extends WithOwner(Entity) {
     this.reviewStartedOn = undefined;
 
     await this.save({status: true, reviewStartedOn: true});
+
+    try {
+      await Mailer.sendMail({
+        to: this.owner.email,
+        subject: `Your ${this.project.name} implementation could not be approved`,
+        html: `
+<p>Hi, ${this.owner.username},</p>
+
+<p>Unfortunately, your ${this.project.name} <a href="${
+          this.repositoryURL
+        }">implementation</a> could not be approved${
+          rejectionReason !== '' ? ` for the following reason(s):` : '.'
+        }</p>${rejectionReason !== '' ? `\n\n<ul><li>${escape(rejectionReason)}.</li></ul>` : ''}
+
+        <p>Feel free to submit again in the future.</p>
+
+<p>--<br>The CodebaseShow project</p>
+`
+      });
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   @expose({call: 'admin'}) @method() async cancelSubmissionReview() {

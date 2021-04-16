@@ -226,14 +226,108 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
                   Project.ReviewImplementationsPage.navigate(project);
                 }}
                 onReject={async () => {
-                  await implementation.rejectSubmission();
-                  Project.ReviewImplementationsPage.navigate(project);
+                  this.ReviewRejectPage.navigate(implementation);
                 }}
                 onCancel={async () => {
                   await implementation.cancelSubmissionReview();
                   Project.ReviewImplementationsPage.navigate(project);
                 }}
               />
+            )}
+          </Project.LoaderView>
+        );
+      });
+    }
+
+    @route('/implementations/:id/review/reject') @view() static ReviewRejectPage({
+      id
+    }: {
+      id: string;
+    }) {
+      const {Project, Common} = this;
+
+      return Common.ensureAdmin(() => {
+        const styles = useStyles();
+
+        const [implementation, , loadingError] = useAsyncMemo(async () => {
+          const implementation = await this.get(id, {
+            project: {slug: true},
+            repositoryURL: true,
+            libraries: true
+          });
+
+          await implementation.reviewSubmission();
+
+          return implementation;
+        }, [id]);
+
+        const [rejectionReason, setRejectionReason] = useState('');
+
+        const [handleSubmit, isSubmitting, submitError] = useAsyncCallback(async () => {
+          await implementation!.rejectSubmission({rejectionReason});
+          Project.ReviewImplementationsPage.navigate({slug: implementation!.project.slug});
+        }, [implementation, rejectionReason]);
+
+        if (loadingError !== undefined) {
+          return (
+            <Common.ErrorLayoutView>
+              <Common.ErrorMessageView error={loadingError} />
+            </Common.ErrorLayoutView>
+          );
+        }
+
+        if (implementation === undefined || isSubmitting) {
+          return <Common.LoadingSpinnerView />;
+        }
+
+        return (
+          <Project.LoaderView slug={implementation.project.slug}>
+            {(_project) => (
+              <Common.DialogView title="Reject a Submission">
+                <implementation.Summary />
+
+                {submitError && (
+                  <Common.ErrorBoxView error={submitError} css={{marginTop: '1.5rem'}} />
+                )}
+
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    handleSubmit();
+                  }}
+                  autoComplete="off"
+                  css={{marginTop: '1.5rem'}}
+                >
+                  <div css={styles.control}>
+                    <label htmlFor="rejectionReason" css={styles.label}>
+                      Rejection reason
+                    </label>
+                    <Input
+                      id="rejectionReason"
+                      value={rejectionReason}
+                      onChange={(event) => {
+                        setRejectionReason(event.target.value);
+                      }}
+                      autoFocus
+                    />
+                  </div>
+
+                  <Common.ButtonBarView>
+                    <Button type="submit" color="primary">
+                      Reject
+                    </Button>
+                    <Button
+                      onClick={(event) => {
+                        event.preventDefault();
+                        this.ReviewPage.navigate(implementation);
+                      }}
+                      variant="outline"
+                    >
+                      Cancel
+                    </Button>
+                  </Common.ButtonBarView>
+                </form>
+              </Common.DialogView>
             )}
           </Project.LoaderView>
         );
@@ -1349,6 +1443,7 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
       });
 
       const [handleReject, isRejecting, rejectError] = useAsyncCallback(async () => {
+        cleanAttributes();
         await onReject!();
       });
 
