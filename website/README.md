@@ -125,6 +125,12 @@ Add another AWS EventBridge rule to automatically run a daily task:
   - Lambda function: `backend-codebase-show`
   - Constant input: `{"query": {"<=": {"__component": "typeof Application"}, "runDailyTask=>": {"()": []}}}`
 
+## Backup
+
+Once a day, all CodebaseShow public data are automatically backed up to the following repository:
+
+https://github.com/codebaseshow/public-data
+
 ## License
 
 MIT

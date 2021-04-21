@@ -7,7 +7,8 @@ async function main() {
   try {
     // await addRealWorldProject();
     // await addTodoMVCProject();
-    await refreshNumberOfImplementations();
+    // await refreshNumberOfImplementations();
+    // await backupPublicData();
     // await generateImplementationLibrariesSortKeys();
     // await setTodoMVCImplementationCreatedAt();
   } finally {
@@ -151,6 +152,12 @@ export async function refreshNumberOfImplementations() {
   const {Project} = Application;
 
   await Project.refreshNumberOfImplementations();
+}
+
+export async function backupPublicData() {
+  const {Project} = Application;
+
+  await Project.backupPublicData();
 }
 
 main().catch((error) => {

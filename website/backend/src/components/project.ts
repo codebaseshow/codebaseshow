@@ -1,16 +1,22 @@
 import {consume, expose, validators} from '@layr/component';
 import {secondaryIdentifier, attribute, index} from '@layr/storable';
+import omit from 'lodash/omit';
 
 import {Entity} from './entity';
 import {WithOwner} from './with-owner';
 import {IMPLEMENTATION_CATEGORIES} from './implementation';
 import type {Implementation, ImplementationCategory} from './implementation';
+import type {GitHub} from './github';
 
 const {rangeLength, anyOf, integer, positive} = validators;
 
 const PROJECT_STATUSES = ['available', 'coming-soon'] as const;
 
 export type ProjectStatus = typeof PROJECT_STATUSES[number];
+
+const PUBLIC_DATA_REPOSITORY_OWNER = 'codebaseshow';
+const PUBLIC_DATA_REPOSITORY_NAME = 'public-data';
+const PUBLIC_DATA_REPOSITORY_PATH = 'public-data.json';
 
 @expose({
   get: {call: true},
@@ -24,6 +30,7 @@ export class Project extends WithOwner(Entity) {
   ['constructor']!: typeof Project;
 
   @consume() static Implementation: typeof Implementation;
+  @consume() static GitHub: typeof GitHub;
 
   @expose({get: true})
   @secondaryIdentifier('string', {validators: [rangeLength([1, 64])]})
@@ -104,5 +111,78 @@ export class Project extends WithOwner(Entity) {
         `The project '${project.name}' has been successfully refreshed (number of implementations: '${project.numberOfImplementations}')`
       );
     }
+  }
+
+  static async backupPublicData() {
+    const {GitHub} = this;
+
+    const publicData = await this.getPublicData();
+
+    await GitHub.writeRepositoryFile({
+      owner: PUBLIC_DATA_REPOSITORY_OWNER,
+      name: PUBLIC_DATA_REPOSITORY_NAME,
+      path: PUBLIC_DATA_REPOSITORY_PATH,
+      content: JSON.stringify(publicData, undefined, 2),
+      message: 'Update CodebaseShow public data'
+    });
+
+    console.log('Public data successfully backed up');
+  }
+
+  static async getPublicData() {
+    const {Implementation} = this;
+
+    const publicData = {projects: new Array<any>()};
+
+    const projects = await this.find(
+      {status: 'available'},
+      {
+        createdAt: true,
+        updatedAt: true,
+        slug: true,
+        name: true,
+        description: true,
+        headline: true,
+        subheading: true,
+        logo: true,
+        screenshot: true,
+        websiteURL: true,
+        createURL: true,
+        demoURL: true,
+        repositoryURL: true,
+        categories: true
+      },
+      {sort: {numberOfImplementations: 'desc'}}
+    );
+
+    for (const project of projects) {
+      const implementations = await Implementation.find(
+        {
+          project,
+          isPubliclyListed: true
+        },
+        {
+          createdAt: true,
+          updatedAt: true,
+          repositoryURL: true,
+          category: true,
+          frontendEnvironment: true,
+          language: true,
+          libraries: true,
+          numberOfStars: true,
+          markedAsUnmaintainedOn: true
+        },
+        {sort: {category: 'asc', numberOfStars: 'desc', librariesSortKey: 'asc'}}
+      );
+
+      publicData.projects.push({
+        ...omit(project.toObject(), 'id'),
+        implementations: implementations.map((implementation) =>
+          omit(implementation.toObject(), 'id')
+        )
+      });
+    }
+
+    return publicData;
   }
 }

@@ -148,13 +148,80 @@ export class GitHub extends Component {
     return undefined;
   }
 
+  static async readRepositoryFile({
+    owner,
+    name,
+    path
+  }: {
+    owner: string;
+    name: string;
+    path: string;
+  }) {
+    try {
+      const data = await this.fetch(`repos/${owner}/${name}/contents/${path}`);
+
+      if (data.type !== 'file') {
+        throw new Error(
+          `Unsupported type '${data.type}' encountered while reading a file from GitHub`
+        );
+      }
+
+      if (data.type !== 'file') {
+        throw new Error(
+          `Unsupported type '${data.type}' encountered while reading a file from GitHub`
+        );
+      }
+
+      if (data.encoding !== 'base64') {
+        throw new Error(
+          `Unsupported encoding '${data.type}' encountered while reading a file from GitHub`
+        );
+      }
+
+      return {content: Buffer.from(data.content, 'base64'), sha: data.sha};
+    } catch (error) {
+      if (error.status === 404) {
+        return undefined;
+      }
+
+      throw error;
+    }
+  }
+
+  static async writeRepositoryFile({
+    owner,
+    name,
+    path,
+    content,
+    message
+  }: {
+    owner: string;
+    name: string;
+    path: string;
+    content: string;
+    message: string;
+  }) {
+    const previousFile = await this.readRepositoryFile({owner, name, path});
+
+    await this.fetch(`repos/${owner}/${name}/contents/${path}`, {
+      method: 'PUT',
+      body: {
+        content: Buffer.from(content, 'utf-8').toString('base64'),
+        message,
+        sha: previousFile?.sha
+      },
+      expectedStatus: previousFile === undefined ? 201 : 200
+    });
+  }
+
   static async fetch(
     path: string,
     {
       method = 'GET',
       body,
+      expectedStatus,
       accessToken = githubPersonalAccessToken
-    }: {method?: string; body?: any; accessToken?: string} = {}
+    }: {method?: string; body?: any; expectedStatus?: number; accessToken?: string} = {}
   ) {
     const response = await fetch(GITHUB_API_BASE_URL + path, {
       method,
@@ -168,7 +235,9 @@ export class GitHub extends Component {
 
     const result = await response.json();
 
-    const expectedStatus = method === 'POST' ? 201 : 200;
+    if (expectedStatus === undefined) {
+      expectedStatus = method === 'POST' ? 201 : 200;
+    }
 
     if (response.status !== expectedStatus) {
       throw Object.assign(

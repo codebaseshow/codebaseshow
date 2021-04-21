@@ -39,7 +39,7 @@ export class Application extends Component {
     const {Project, Implementation} = this;
 
     await Implementation.checkMaintenanceStatus();
-
     await Project.refreshNumberOfImplementations();
+    await Project.backupPublicData();
   }
 }
