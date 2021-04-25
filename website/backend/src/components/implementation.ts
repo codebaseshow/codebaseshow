@@ -51,8 +51,8 @@ const ADMIN_TOKEN_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
   category: 'asc',
   status: 'asc',
   repositoryStatus: 'asc',
-  numberOfStars: 'desc',
-  librariesSortKey: 'asc'
+  librariesSortKey: 'asc',
+  language: 'asc'
 })
 @index({
   project: 'asc',
@@ -127,11 +127,6 @@ export class Implementation extends WithOwner(Entity) {
   @attribute('Date?') reviewStartedOn?: Date;
 
   @expose({get: true})
-  @index()
-  @attribute('number?', {validators: [optional([integer(), positive()])]})
-  numberOfStars?: number;
-
-  @expose({get: true})
   @attribute('number?', {validators: [optional([integer(), positive()])]})
   numberOfPendingIssues?: number;
 
@@ -182,15 +177,12 @@ export class Implementation extends WithOwner(Entity) {
       });
     }
 
-    const {owner, name, isRoot} = parseRepositoryURL(this.repositoryURL);
+    const {owner, name} = parseRepositoryURL(this.repositoryURL);
 
-    const {
-      ownerId,
-      numberOfStars,
-      isArchived,
-      hasIssues,
-      githubData
-    } = await GitHub.fetchRepository({owner, name});
+    const {ownerId, isArchived, hasIssues, githubData} = await GitHub.fetchRepository({
+      owner,
+      name
+    });
 
     if (!Session.user!.isAdmin) {
       const userId = Session.user!.githubId;
@@ -219,7 +211,6 @@ export class Implementation extends WithOwner(Entity) {
       });
     }
 
-    this.numberOfStars = isRoot ? numberOfStars : undefined;
     this.githubData = githubData;
     this.githubDataFetchedOn = new Date();
 
@@ -244,15 +235,14 @@ export class Implementation extends WithOwner(Entity) {
       throw new Error('Cannot add a non-new implementation');
     }
 
-    const {owner, name, isRoot} = parseRepositoryURL(this.repositoryURL);
+    const {owner, name} = parseRepositoryURL(this.repositoryURL);
 
-    const {numberOfStars, githubData} = await GitHub.fetchRepository({
+    const {githubData} = await GitHub.fetchRepository({
       owner,
       name
     });
 
     this.status = 'approved';
-    this.numberOfStars = isRoot ? numberOfStars : undefined;
     this.githubData = githubData;
     this.githubDataFetchedOn = new Date();
 
@@ -748,14 +738,13 @@ New owner:
     await this.load({repositoryURL: true});
 
     try {
-      const {owner, name, isRoot} = parseRepositoryURL(this.repositoryURL);
+      const {owner, name} = parseRepositoryURL(this.repositoryURL);
 
-      const {numberOfStars, isArchived, hasIssues, githubData} = await GitHub.fetchRepository({
+      const {isArchived, hasIssues, githubData} = await GitHub.fetchRepository({
         owner,
         name
       });
 
-      this.numberOfStars = isRoot ? numberOfStars : undefined;
       this.githubData = githubData;
 
       if (isArchived) {
@@ -772,11 +761,11 @@ New owner:
     } catch (error) {
       if (error.code === 'REPOSITORY_NOT_FOUND') {
         this.repositoryStatus = 'missing';
+      } else {
+        console.error(
+          `An error occurred while refreshing the implementation '${this.repositoryURL}' (${error.message})`
+        );
       }
-
-      console.error(
-        `An error occurred while refreshing the implementation '${this.repositoryURL}' (${error.message})`
-      );
     }
 
     this.githubDataFetchedOn = new Date();

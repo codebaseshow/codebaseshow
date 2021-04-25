@@ -4,10 +4,9 @@ import {Fragment, useState, useCallback} from 'react';
 import {view, useAsyncCallback, useAsyncMemo} from '@layr/react-integration';
 import {jsx, useTheme} from '@emotion/react';
 import {Input, Select, Button} from '@emotion-starter/react';
-import {Stack, Box, Badge, ComboBox, DropdownMenu, StarIcon, LaunchIcon} from '@emotion-kit/react';
+import {Stack, Box, Badge, ComboBox, DropdownMenu, LaunchIcon} from '@emotion-kit/react';
 import compact from 'lodash/compact';
 import {formatDistanceToNowStrict} from 'date-fns';
-import numeral from 'numeral';
 import sortBy from 'lodash/sortBy';
 import partition from 'lodash/partition';
 
@@ -752,12 +751,11 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
             frontendEnvironment: true,
             language: true,
             libraries: true,
-            numberOfStars: true,
             markedAsUnmaintainedOn: true,
             owner: {},
             createdAt: true
           },
-          {sort: {numberOfStars: 'desc', librariesSortKey: 'asc'}}
+          {sort: {librariesSortKey: 'asc', language: 'asc'}}
         );
 
         const [active, unmaintained] = partition(
@@ -906,27 +904,6 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
 
                                 <div css={{width: '150px', lineHeight: 1}}>
                                   {implementation.language}
-                                </div>
-
-                                <div
-                                  css={{
-                                    width: '90px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    lineHeight: 1,
-                                    visibility:
-                                      implementation.numberOfStars !== undefined
-                                        ? 'visible'
-                                        : 'hidden'
-                                  }}
-                                >
-                                  <StarIcon
-                                    size={20}
-                                    color={theme.colors.text.muted}
-                                    outline
-                                    css={{marginRight: '.25rem'}}
-                                  />
-                                  {implementation.formatNumberOfStars()}
                                 </div>
                               </div>
                             </a>
@@ -1795,10 +1772,6 @@ export const getImplementation = (Base: typeof BackendImplementation) => {
 
     formatLibraries() {
       return this.libraries.join(' + ');
-    }
-
-    formatNumberOfStars() {
-      return numeral(this.numberOfStars).format('0.[0]a');
     }
 
     formatStatus() {

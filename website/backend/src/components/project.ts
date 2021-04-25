@@ -169,10 +169,9 @@ export class Project extends WithOwner(Entity) {
           frontendEnvironment: true,
           language: true,
           libraries: true,
-          numberOfStars: true,
           markedAsUnmaintainedOn: true
         },
-        {sort: {category: 'asc', numberOfStars: 'desc', librariesSortKey: 'asc'}}
+        {sort: {category: 'asc', librariesSortKey: 'asc', language: 'asc'}}
       );
 
       publicData.projects.push({
