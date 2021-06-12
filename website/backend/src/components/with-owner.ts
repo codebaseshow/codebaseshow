@@ -11,10 +11,10 @@ export const WithOwner = (Base: typeof Entity) => {
 
     @consume() static User: typeof User;
 
-    @expose({get: true}) @attribute('User') owner = this.constructor.Session.user!;
+    @expose({get: true, set: 'owner'}) @attribute('User') owner!: User;
 
     @role('owner') async ownerRoleResolver() {
-      const user = this.constructor.Session.user;
+      const user = await this.constructor.User.getAuthenticatedUser();
 
       if (user === undefined) {
         return undefined;

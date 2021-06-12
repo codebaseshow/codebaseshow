@@ -1,19 +1,17 @@
 import {consume, expose, validators, AttributeSelector} from '@layr/component';
 import {attribute, method, index, finder} from '@layr/storable';
-import env from 'env-var';
+import compact from 'lodash/compact';
 import escape from 'lodash/escape';
 
 import type {User} from './user';
 import type {Project} from './project';
 import {Entity} from './entity';
 import {WithOwner} from './with-owner';
-import type {GitHub} from './github';
-import type {Mailer} from './mailer';
-import type {JWT} from './jwt';
+import {GitHub} from '../github';
+import {Mailer} from '../mailer';
+import {generateJWT, verifyJWT} from '../jwt';
 
 const {optional, maxLength, rangeLength, match, anyOf, integer, positive} = validators;
-
-const frontendURL = env.get('FRONTEND_URL').required().asUrlString();
 
 export const IMPLEMENTATION_CATEGORIES = ['frontend', 'backend', 'fullstack'] as const;
 
@@ -31,7 +29,7 @@ const REPOSITORY_STATUSES = ['available', 'archived', 'issues-disabled', 'missin
 
 export type RepositoryStatus = typeof REPOSITORY_STATUSES[number];
 
-const MAXIMUM_REVIEW_DURATION = 5 * 60 * 1000; // 5 minutes
+export const MAXIMUM_REVIEW_DURATION = 5 * 60 * 1000; // 5 minutes
 
 const MAXIMUM_UNMAINTAINED_ISSUE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -63,9 +61,6 @@ export class Implementation extends WithOwner(Entity) {
   ['constructor']!: typeof Implementation;
 
   @consume() static Project: typeof Project;
-  @consume() static GitHub: typeof GitHub;
-  @consume() static Mailer: typeof Mailer;
-  @consume() static JWT: typeof JWT;
 
   @expose({get: true, set: ['owner', 'admin']})
   @attribute('Project')
@@ -73,6 +68,12 @@ export class Implementation extends WithOwner(Entity) {
 
   @expose({get: true, set: ['owner', 'admin']})
   @attribute('string', {
+    beforeSave(this: Implementation, attribute) {
+      // TODO: Simplify by implementing the concept of transformers/normalizers
+      attribute.setValue((attribute.getValue() as string).trim(), {
+        source: attribute.getValueSource()
+      });
+    },
     validators: [maxLength(500), match(/^https\:\/\/github\.com\//)]
   })
   repositoryURL!: string;
@@ -100,12 +101,34 @@ export class Implementation extends WithOwner(Entity) {
 
   @expose({get: true, set: ['owner', 'admin']})
   @index()
-  @attribute('string', {validators: [rangeLength([1, 100])]})
+  @attribute('string', {
+    beforeSave(this: Implementation, attribute) {
+      // TODO: Simplify by implementing the concept of transformers/normalizers
+      attribute.setValue((attribute.getValue() as string).trim(), {
+        source: attribute.getValueSource()
+      });
+    },
+    validators: [rangeLength([1, 100])]
+  })
   language!: string;
 
   @expose({get: true, set: ['owner', 'admin']})
   @index()
   @attribute('string[]', {
+    beforeSave(this: Implementation, attribute) {
+      // TODO: Simplify by implementing the concept of transformers/normalizers
+      const libraries = compact(
+        (attribute.getValue() as string[]).map((library) => library.trim())
+      );
+
+      if (libraries.length === 0) {
+        throw Object.assign(new Error(`'libraries' cannot be empty`), {
+          displayMessage: 'You must specify at least one library or framework.'
+        });
+      }
+
+      attribute.setValue(libraries, {source: attribute.getValueSource()});
+    },
     validators: [rangeLength([1, 5])],
     items: {validators: [rangeLength([1, 50])]}
   })
@@ -165,16 +188,10 @@ export class Implementation extends WithOwner(Entity) {
   }
 
   @expose({call: 'owner'}) @method() async submit() {
-    const {Session, GitHub, Mailer} = this.constructor;
+    const {User} = this.constructor;
 
     if (!this.isNew()) {
       throw new Error('Cannot submit a non-new implementation');
-    }
-
-    if (this.libraries.length === 0) {
-      throw Object.assign(new Error(`'libraries' cannot be empty`), {
-        displayMessage: 'You must specify at least one library or framework.'
-      });
     }
 
     const {owner, name} = parseRepositoryURL(this.repositoryURL);
@@ -184,8 +201,10 @@ export class Implementation extends WithOwner(Entity) {
       name
     });
 
-    if (!Session.user!.isAdmin) {
-      const userId = Session.user!.githubId;
+    const authenticatedUser = (await User.getAuthenticatedUser())!;
+
+    if (!authenticatedUser.isAdmin) {
+      const userId = authenticatedUser.githubId;
 
       if (ownerId !== userId) {
         const contributor = await GitHub.findRepositoryContributor({owner, name, userId});
@@ -216,12 +235,12 @@ export class Implementation extends WithOwner(Entity) {
 
     await this.save();
 
-    await this.project.load({name: true});
+    await this.project.load({slug: true, name: true});
 
     try {
       await Mailer.sendMail({
         subject: `A new ${this.project.name} implementation has been submitted`,
-        text: `A new ${this.project.name} implementation has been submitted:\n\n${frontendURL}implementations/${this.id}/review\n`
+        text: `A new ${this.project.name} implementation has been submitted:\n\n${process.env.FRONTEND_URL}projects/${this.project.slug}/implementations/${this.id}/review\n`
       });
     } catch (error) {
       console.error(error);
@@ -229,8 +248,6 @@ export class Implementation extends WithOwner(Entity) {
   }
 
   @expose({call: 'admin'}) @method() async add() {
-    const {GitHub} = this.constructor;
-
     if (!this.isNew()) {
       throw new Error('Cannot add a non-new implementation');
     }
@@ -249,52 +266,17 @@ export class Implementation extends WithOwner(Entity) {
     await this.save();
   }
 
-  @expose({call: 'admin'}) @method() static async findSubmissionsToReview<
-    T extends typeof Implementation
-  >(this: T, {project}: {project: Project}) {
-    const {Session} = this;
-
-    return (await this.find(
-      {
-        $or: [
-          {
-            project,
-            status: 'pending'
-          },
-          {
-            project,
-            status: 'reviewing',
-            reviewer: Session.user
-          },
-          {
-            project,
-            status: 'reviewing',
-            reviewStartedOn: {$lessThan: new Date(Date.now() - MAXIMUM_REVIEW_DURATION)}
-          }
-        ]
-      },
-      {
-        project: {},
-        repositoryURL: true,
-        category: true,
-        frontendEnvironment: true,
-        language: true,
-        libraries: true,
-        createdAt: true
-      },
-      {sort: {createdAt: 'asc'}}
-    )) as InstanceType<T>[];
-  }
-
   @expose({call: 'admin'}) @method() async reviewSubmission() {
-    const {Session} = this.constructor;
+    const {User} = this.constructor;
+
+    const authenticatedUser = (await User.getAuthenticatedUser())!;
 
     await this.load({status: true, reviewer: {}, reviewStartedOn: true});
 
     if (this.status === 'reviewing') {
       const reviewDuration = Date.now() - this.reviewStartedOn!.valueOf();
 
-      if (this.reviewer !== Session.user && reviewDuration < MAXIMUM_REVIEW_DURATION) {
+      if (this.reviewer !== authenticatedUser && reviewDuration < MAXIMUM_REVIEW_DURATION) {
         throw Object.assign(new Error('Implementation currently reviewed'), {
           displayMessage: 'This submission is currently being reviewed by another administrator.'
         });
@@ -306,14 +288,16 @@ export class Implementation extends WithOwner(Entity) {
     }
 
     this.status = 'reviewing';
-    this.reviewer = Session.user;
+    this.reviewer = authenticatedUser;
     this.reviewStartedOn = new Date();
 
     await this.save();
   }
 
   @expose({call: 'admin'}) @method() async approveSubmission() {
-    const {Session, Mailer} = this.constructor;
+    const {User} = this.constructor;
+
+    const authenticatedUser = (await User.getAuthenticatedUser())!;
 
     await this.load({
       project: {slug: true, name: true},
@@ -324,7 +308,7 @@ export class Implementation extends WithOwner(Entity) {
       reviewer: {}
     });
 
-    if (this.status !== 'reviewing' || this.reviewer !== Session.user) {
+    if (this.status !== 'reviewing' || this.reviewer !== authenticatedUser) {
       throw new Error('Approval error');
     }
 
@@ -340,7 +324,7 @@ export class Implementation extends WithOwner(Entity) {
         html: `
 <p>Hi, ${this.owner.username},</p>
 
-<p>Your ${this.project.name} <a href="${this.repositoryURL}">implementation</a> has been approved and is now listed on the <a href="${frontendURL}projects/${this.project.slug}?category=${this.category}">project's home page</a>.</p>
+<p>Your ${this.project.name} <a href="${this.repositoryURL}">implementation</a> has been approved and is now listed on the <a href="${process.env.FRONTEND_URL}projects/${this.project.slug}?category=${this.category}">project's home page</a>.</p>
 
 <p>Thanks a lot for your contribution!</p>
 
@@ -356,7 +340,9 @@ export class Implementation extends WithOwner(Entity) {
     // Rejection reason examples:
     // - This implementation seems to be a work in progress
 
-    const {Session, Mailer} = this.constructor;
+    const {User} = this.constructor;
+
+    const authenticatedUser = (await User.getAuthenticatedUser())!;
 
     await this.load({
       project: {slug: true, name: true},
@@ -367,7 +353,7 @@ export class Implementation extends WithOwner(Entity) {
       reviewer: {}
     });
 
-    if (this.status !== 'reviewing' || this.reviewer !== Session.user) {
+    if (this.status !== 'reviewing' || this.reviewer !== authenticatedUser) {
       throw new Error('Rejection error');
     }
 
@@ -400,11 +386,13 @@ export class Implementation extends WithOwner(Entity) {
   }
 
   @expose({call: 'admin'}) @method() async cancelSubmissionReview() {
-    const {Session} = this.constructor;
+    const {User} = this.constructor;
+
+    const authenticatedUser = (await User.getAuthenticatedUser())!;
 
     await this.load({status: true, reviewer: {}});
 
-    if (this.status !== 'reviewing' || this.reviewer !== Session.user) {
+    if (this.status !== 'reviewing' || this.reviewer !== authenticatedUser) {
       throw new Error('Cancellation error');
     }
 
@@ -416,11 +404,11 @@ export class Implementation extends WithOwner(Entity) {
   }
 
   @expose({call: 'user'}) @method() async reportAsUnmaintained(issueNumber: number) {
-    const {Session, GitHub, Mailer, JWT} = this.constructor;
+    const {User} = this.constructor;
 
-    await Session.user!.load({username: true});
+    const authenticatedUser = (await User.getAuthenticatedUser({username: true}))!;
 
-    await this.load({project: {name: true}, repositoryURL: true});
+    await this.load({project: {slug: true, name: true}, repositoryURL: true});
 
     const {owner, name} = parseRepositoryURL(this.repositoryURL);
 
@@ -432,18 +420,18 @@ export class Implementation extends WithOwner(Entity) {
       });
     }
 
-    const implementationURL = `${frontendURL}implementations/${this.id}/edit`;
+    const implementationURL = `${process.env.FRONTEND_URL}projects/${this.project.slug}/implementations/${this.id}/edit`;
 
-    const userURL = `https://github.com/${Session.user!.username}`;
+    const userURL = `https://github.com/${authenticatedUser.username}`;
 
-    const approvalToken = JWT.generate({
+    const approvalToken = generateJWT({
       operation: 'approve-unmaintained-implementation-report',
       implementationId: this.id,
       issueNumber,
       exp: Math.round((Date.now() + ADMIN_TOKEN_DURATION) / 1000)
     });
 
-    const approvalURL = `${frontendURL}implementations/${
+    const approvalURL = `${process.env.FRONTEND_URL}projects/${this.project.slug}/implementations/${
       this.id
     }/approve-unmaintained-report?token=${encodeURIComponent(approvalToken)}`;
 
@@ -488,9 +476,7 @@ Click the following link to approve the report:
   }
 
   @expose({call: 'admin'}) @method() static async approveUnmaintainedReport(token: string) {
-    const {JWT} = this;
-
-    const payload = JWT.verify(token) as
+    const payload = verifyJWT(token) as
       | {operation: string; implementationId: string; issueNumber: number}
       | undefined;
 
@@ -515,11 +501,11 @@ Click the following link to approve the report:
   }
 
   @expose({call: ['owner', 'admin']}) @method() async markAsUnmaintained() {
-    const {Session, Mailer} = this.constructor;
+    const {User} = this.constructor;
 
-    await Session.user!.load({username: true});
+    const authenticatedUser = (await User.getAuthenticatedUser({username: true}))!;
 
-    await this.load({project: {name: true}, repositoryURL: true});
+    await this.load({project: {slug: true, name: true}, repositoryURL: true});
 
     this.unmaintainedIssueNumber = undefined;
     this.markedAsUnmaintainedOn = new Date();
@@ -529,13 +515,13 @@ Click the following link to approve the report:
       `The implementation '${this.repositoryURL}' has been marked as unmaintained by its owner (id: '${this.id}')`
     );
 
-    const implementationURL = `${frontendURL}implementations/${this.id}/edit`;
+    const implementationURL = `${process.env.FRONTEND_URL}projects/${this.project.slug}/implementations/${this.id}/edit`;
 
-    const userURL = `https://github.com/${Session.user!.username}`;
+    const userURL = `https://github.com/${authenticatedUser.username}`;
 
     const html = `
 <p>
-The following ${this.project.name} implementation has been mark as unmaintained by its owner:
+The following ${this.project.name} implementation has been marked as unmaintained by its owner:
 </p>
 
 <p>
@@ -558,12 +544,15 @@ Owner:
   }
 
   @expose({call: 'user'}) @method() async claimOwnership() {
-    const {Session, Mailer, GitHub} = this.constructor;
+    const {User} = this.constructor;
 
-    await Session.user!.load({username: true, githubId: true});
+    const authenticatedUser = (await User.getAuthenticatedUser({
+      username: true,
+      githubId: true
+    }))!;
 
     await this.load({
-      project: {name: true},
+      project: {slug: true, name: true},
       repositoryURL: true,
       owner: {username: true, isAdmin: true}
     });
@@ -579,7 +568,7 @@ Owner:
 
     const {ownerId} = await GitHub.fetchRepository({owner, name});
 
-    const userId = Session.user!.githubId;
+    const userId = authenticatedUser.githubId;
 
     if (ownerId !== userId) {
       const contributor = await GitHub.findRepositoryContributor({owner, name, userId});
@@ -594,18 +583,18 @@ Owner:
 
     const previousOwner = this.owner;
 
-    this.owner = Session.user!;
+    this.owner = authenticatedUser;
     await this.save();
 
     console.log(
       `The ownership of the implementation '${this.repositoryURL}' has been claimed (id: '${this.id}')`
     );
 
-    const implementationURL = `${frontendURL}implementations/${this.id}/edit`;
+    const implementationURL = `${process.env.FRONTEND_URL}projects/${this.project.slug}/implementations/${this.id}/edit`;
 
     const previousOwnerURL = `https://github.com/${previousOwner.username}`;
 
-    const newOwnerURL = `https://github.com/${Session.user!.username}`;
+    const newOwnerURL = `https://github.com/${authenticatedUser.username}`;
 
     const html = `
 <p>
@@ -661,8 +650,6 @@ New owner:
   }
 
   async checkMaintenanceStatus() {
-    const {GitHub} = this.constructor;
-
     await this.load({
       repositoryURL: true,
       unmaintainedIssueNumber: true,
@@ -733,8 +720,6 @@ New owner:
   }
 
   async refreshGitHubData() {
-    const {GitHub} = this.constructor;
-
     await this.load({repositoryURL: true});
 
     try {

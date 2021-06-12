@@ -1,13 +1,8 @@
 import {Component} from '@layr/component';
 import fetch from 'cross-fetch';
-import env from 'env-var';
 
 const GITHUB_API_BASE_URL = 'https://api.github.com/';
 const GITHUB_LOGIN_URL = 'https://github.com/login/oauth/access_token';
-
-const githubClientId = env.get('GITHUB_CLIENT_ID').required().asString();
-const githubClientSecret = env.get('GITHUB_CLIENT_SECRET').required().asString();
-const githubPersonalAccessToken = env.get('GITHUB_PERSONAL_ACCESS_TOKEN').required().asString();
 
 const PENDING_ISSUE_MINIMUM_AGE = 10 * 24 * 60 * 60 * 1000; // 10 days
 
@@ -220,7 +215,7 @@ export class GitHub extends Component {
       method = 'GET',
       body,
       expectedStatus,
-      accessToken = githubPersonalAccessToken
+      accessToken = process.env.GITHUB_PERSONAL_ACCESS_TOKEN
     }: {method?: string; body?: any; expectedStatus?: number; accessToken?: string} = {}
   ) {
     const response = await fetch(GITHUB_API_BASE_URL + path, {
@@ -261,8 +256,8 @@ export class GitHub extends Component {
         'Accept': 'application/json'
       },
       body: JSON.stringify({
-        client_id: githubClientId,
-        client_secret: githubClientSecret,
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
         code,
         state
       })

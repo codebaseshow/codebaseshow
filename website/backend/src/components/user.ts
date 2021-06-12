@@ -1,16 +1,17 @@
-import {consume, expose} from '@layr/component';
+import {expose, AttributeSelector} from '@layr/component';
 import {secondaryIdentifier, attribute, method} from '@layr/storable';
 import {role} from '@layr/with-roles';
 import isEqual from 'lodash/isEqual';
 
 import {Entity} from './entity';
-import type {GitHub} from './github';
+import {GitHub} from '../github';
+import {generateJWT, verifyJWT} from '../jwt';
+
+const TOKEN_DURATION = 31536000000; // 1 year
 
 @expose({get: {call: true}, prototype: {load: {call: true}, save: {call: 'self'}}})
 export class User extends Entity {
   ['constructor']!: typeof User;
-
-  @consume() static GitHub: typeof GitHub;
 
   @secondaryIdentifier('number') githubId!: number;
 
@@ -28,8 +29,56 @@ export class User extends Entity {
   @attribute('boolean')
   isAdmin = false;
 
-  @role('self') selfRoleResolver() {
-    return this === this.constructor.Session.user;
+  @expose({get: true, set: true})
+  @attribute('string?')
+  static token?: string;
+
+  @role('self') async selfRoleResolver() {
+    return this === (await this.constructor.getAuthenticatedUser());
+  }
+
+  @expose({call: true}) @method() static async getAuthenticatedUser(
+    attributeSelector: AttributeSelector = {githubId: true, isAdmin: true}
+  ) {
+    if (this.token === undefined) {
+      return;
+    }
+
+    const userId = this.verifyToken(this.token);
+
+    if (userId === undefined) {
+      // The token is invalid or expired
+      this.token = undefined;
+      return;
+    }
+
+    const user = await this.get(userId, attributeSelector, {
+      throwIfMissing: false
+    });
+
+    if (user === undefined) {
+      // The user doesn't exist anymore
+      this.token = undefined;
+      return;
+    }
+
+    return user;
+  }
+
+  static verifyToken(token: string) {
+    const payload = verifyJWT(token) as {sub: string} | undefined;
+    const userId = payload?.sub;
+
+    return userId;
+  }
+
+  static generateToken(userId: string, {expiresIn = TOKEN_DURATION} = {}) {
+    const token = generateJWT({
+      sub: userId,
+      exp: Math.round((Date.now() + expiresIn) / 1000)
+    });
+
+    return token;
   }
 
   @expose({call: true}) @method() static async signIn({
@@ -39,9 +88,6 @@ export class User extends Entity {
     code: string;
     state: string;
   }) {
-    const {GitHub} = this;
-    const {Session} = this;
-
     const accessToken = await GitHub.fetchAccessToken({code, state});
 
     const {githubId, username, email, name, avatarURL, githubData} = await GitHub.fetchUser({
@@ -60,6 +106,6 @@ export class User extends Entity {
       await user.save();
     }
 
-    Session.token = Session.generateToken(user.id);
+    this.token = this.generateToken(user.id);
   }
 }

@@ -1,15 +1,15 @@
 import {consume} from '@layr/component';
-import {Routable, route} from '@layr/routable';
+import {attribute} from '@layr/storable';
+import {Routable} from '@layr/routable';
 import {Fragment} from 'react';
 import {jsx} from '@emotion/react';
-import {view, useAsyncCall} from '@layr/react-integration';
-import {DropdownMenu} from '@emotion-kit/react';
+import {page, view, useData, useNavigator, useAsyncCall} from '@layr/react-integration';
+import {Box, DropdownMenu} from '@emotion-kit/react';
 
 import type {User as BackendUser} from '../../../backend/src/components/user';
 import type {Application} from './application';
-import type {Session} from './session';
 import type {Implementation} from './implementation';
-import type {Common} from './common';
+import {ErrorLayout, Table} from '../ui';
 
 const githubClientId = process.env.GITHUB_CLIENT_ID;
 
@@ -17,14 +17,73 @@ if (!githubClientId) {
   throw new Error(`'GITHUB_CLIENT_ID' environment variable is missing`);
 }
 
-export const getUser = (Base: typeof BackendUser) => {
+export const extendUser = (Base: typeof BackendUser) => {
   class User extends Routable(Base) {
     ['constructor']!: typeof User;
 
     @consume() static Application: typeof Application;
-    @consume() static Session: typeof Session;
     @consume() static Implementation: typeof Implementation;
-    @consume() static Common: typeof Common;
+
+    @attribute('string?', {
+      getter() {
+        return window.localStorage.getItem('token') || undefined;
+      },
+      setter(token) {
+        if (token !== undefined) {
+          window.localStorage.setItem('token', token);
+        } else {
+          window.localStorage.removeItem('token');
+        }
+      }
+    })
+    static token?: string;
+
+    @attribute('User?') static authenticatedUser?: User;
+
+    static async initializer() {
+      this.authenticatedUser = (await this.getAuthenticatedUser({
+        username: true,
+        avatarURL: true,
+        isAdmin: true
+      })) as User;
+    }
+
+    static ensureGuest(content: () => JSX.Element | null) {
+      const {Application} = this;
+
+      if (this.authenticatedUser !== undefined) {
+        Application.HomePage.redirect();
+        return null;
+      }
+
+      return content();
+    }
+
+    static ensureAuthenticatedUser(content: (user: User) => JSX.Element | null) {
+      const navigator = useNavigator();
+
+      if (this.authenticatedUser === undefined) {
+        this.SignInPage.redirect({redirectURL: navigator.getCurrentPath()});
+        return null;
+      }
+
+      return content(this.authenticatedUser);
+    }
+
+    static ensureAuthenticatedAdmin(content: (user: User) => JSX.Element | null) {
+      const navigator = useNavigator();
+
+      if (this.authenticatedUser === undefined) {
+        this.SignInPage.redirect({redirectURL: navigator.getCurrentPath()});
+        return null;
+      }
+
+      if (!this.authenticatedUser.isAdmin) {
+        return <ErrorLayout>Sorry, this page is restricted to administrators only.</ErrorLayout>;
+      }
+
+      return content(this.authenticatedUser);
+    }
 
     @view() MenuView() {
       const User = this.constructor;
@@ -46,7 +105,7 @@ export const getUser = (Base: typeof BackendUser) => {
             {
               label: 'Your implementations',
               onClick: () => {
-                User.ImplementationsPage.navigate();
+                User.ImplementationListPage.navigate();
               }
             },
             {type: 'divider'},
@@ -77,14 +136,12 @@ export const getUser = (Base: typeof BackendUser) => {
       );
     }
 
-    @route('/sign-in\\?:redirectURL') @view() static SignInPage({
+    @page('/sign-in', {params: {redirectURL: 'string?'}}) static SignInPage({
       redirectURL
     }: {
       redirectURL?: string;
     }) {
-      const {Common} = this;
-
-      return Common.ensureGuest(() => {
+      return this.ensureGuest(() => {
         const key = ((Math.random() * Math.pow(36, 6)) | 0).toString(36);
         const encodedState = window.btoa(JSON.stringify({key, redirectURL}));
 
@@ -100,14 +157,17 @@ export const getUser = (Base: typeof BackendUser) => {
       });
     }
 
-    @route('/oauth/callback\\?:code&:state&:error') @view() static OAuthCallbackPage({
+    @page('/oauth/callback', {params: {code: 'string?', state: 'string?', error: 'string?'}})
+    static OAuthCallbackPage({
       code,
       state,
       error
     }: {code?: string; state?: string; error?: string} = {}) {
-      const {Application, Common} = this;
+      const {Application} = this;
 
-      return Common.ensureGuest(() => {
+      return this.ensureGuest(() => {
+        const navigator = useNavigator();
+
         const [isSigningIn, signingInError] = useAsyncCall(async () => {
           const savedState = window.sessionStorage.getItem('oAuthState');
           window.sessionStorage.removeItem('oAuthState');
@@ -127,7 +187,7 @@ export const getUser = (Base: typeof BackendUser) => {
           await this.signIn({code, state});
 
           if (decodedState.redirectURL !== undefined) {
-            this.getRouter().reload(decodedState.redirectURL);
+            navigator.reload(decodedState.redirectURL);
           } else {
             Application.HomePage.reload();
           }
@@ -138,35 +198,80 @@ export const getUser = (Base: typeof BackendUser) => {
         }
 
         if (signingInError) {
-          return (
-            <Common.ErrorLayoutView>
-              Sorry, an error occurred while signing in to GitHub.
-            </Common.ErrorLayoutView>
-          );
+          return <ErrorLayout>Sorry, an error occurred while signing in to GitHub.</ErrorLayout>;
         }
 
         return null;
       });
     }
 
-    @route('/sign-out') @view() static SignOutPage() {
-      const {Application, Session} = this;
+    @page('/sign-out') static SignOutPage() {
+      const {Application, User} = this;
 
-      Session.token = undefined;
+      User.token = undefined;
 
       Application.HomePage.reload();
 
       return null;
     }
 
-    @route('/user/implementations') @view() static ImplementationsPage() {
-      const {Application, Implementation, Common} = this;
+    @page('[/]user/implementations') static ImplementationListPage() {
+      const {Implementation} = this;
 
-      return Common.ensureUser((user) => {
-        return (
-          <Application.LayoutView>
-            <Implementation.UserListView user={user} />
-          </Application.LayoutView>
+      return this.ensureAuthenticatedUser((user) => {
+        const navigator = useNavigator();
+
+        return useData(
+          async () => {
+            return await Implementation.find(
+              {owner: user},
+              {
+                project: {slug: true},
+                repositoryURL: true,
+                createdAt: true,
+                status: true
+              },
+              {sort: {createdAt: 'desc'}}
+            );
+          },
+
+          (implementations) => (
+            <div>
+              <h3>Your Implementations</h3>
+
+              {implementations.length > 0 && (
+                <Table
+                  columns={[
+                    {
+                      header: 'Repository',
+                      body: (implementation) => implementation.formatRepositoryURL()
+                    },
+                    {
+                      width: 125,
+                      header: 'Status',
+                      body: (implementation) => implementation.formatStatus()
+                    },
+                    {
+                      width: 125,
+                      header: 'Submitted',
+                      body: (implementation) => implementation.formatCreatedAt()
+                    }
+                  ]}
+                  items={implementations}
+                  onItemClick={(implementation) => {
+                    implementation.EditPage.navigate({
+                      callbackURL: navigator.getCurrentURL()
+                    });
+                  }}
+                  css={{marginTop: '2rem'}}
+                />
+              )}
+
+              {implementations.length === 0 && (
+                <Box css={{marginTop: '2rem', padding: '1rem'}}>You have no implementations.</Box>
+              )}
+            </div>
+          )
         );
       });
     }
@@ -175,6 +280,6 @@ export const getUser = (Base: typeof BackendUser) => {
   return User;
 };
 
-export declare const User: ReturnType<typeof getUser>;
+export declare const User: ReturnType<typeof extendUser>;
 
 export type User = InstanceType<typeof User>;

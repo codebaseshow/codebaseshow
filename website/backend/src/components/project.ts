@@ -1,12 +1,12 @@
-import {consume, expose, validators} from '@layr/component';
+import {consume, method, expose, validators} from '@layr/component';
 import {secondaryIdentifier, attribute, index} from '@layr/storable';
 import omit from 'lodash/omit';
 
 import {Entity} from './entity';
 import {WithOwner} from './with-owner';
-import {IMPLEMENTATION_CATEGORIES} from './implementation';
+import {IMPLEMENTATION_CATEGORIES, MAXIMUM_REVIEW_DURATION} from './implementation';
 import type {Implementation, ImplementationCategory} from './implementation';
-import type {GitHub} from './github';
+import {GitHub} from '../github';
 
 const {rangeLength, anyOf, integer, positive} = validators;
 
@@ -30,9 +30,8 @@ export class Project extends WithOwner(Entity) {
   ['constructor']!: typeof Project;
 
   @consume() static Implementation: typeof Implementation;
-  @consume() static GitHub: typeof GitHub;
 
-  @expose({get: true})
+  @expose({get: true, set: true})
   @secondaryIdentifier('string', {validators: [rangeLength([1, 64])]})
   slug!: string;
 
@@ -94,6 +93,43 @@ export class Project extends WithOwner(Entity) {
   @attribute('number', {validators: [integer(), positive()]})
   numberOfImplementations!: number;
 
+  @expose({call: 'admin'}) @method() async findSubmissionsToReview<T extends Project>(this: T) {
+    const {User, Implementation} = this.constructor;
+
+    const authenticatedUser = (await User.getAuthenticatedUser())!;
+
+    return (await Implementation.find(
+      {
+        $or: [
+          {
+            project: this,
+            status: 'pending'
+          },
+          {
+            project: this,
+            status: 'reviewing',
+            reviewer: authenticatedUser
+          },
+          {
+            project: this,
+            status: 'reviewing',
+            reviewStartedOn: {$lessThan: new Date(Date.now() - MAXIMUM_REVIEW_DURATION)}
+          }
+        ]
+      },
+      {
+        project: {},
+        repositoryURL: true,
+        category: true,
+        frontendEnvironment: true,
+        language: true,
+        libraries: true,
+        createdAt: true
+      },
+      {sort: {createdAt: 'asc'}}
+    )) as InstanceType<T['constructor']['Implementation']>[];
+  }
+
   static async refreshNumberOfImplementations() {
     const {Implementation} = this;
 
@@ -114,8 +150,6 @@ export class Project extends WithOwner(Entity) {
   }
 
   static async backupPublicData() {
-    const {GitHub} = this;
-
     const publicData = await this.getPublicData();
 
     await GitHub.writeRepositoryFile({

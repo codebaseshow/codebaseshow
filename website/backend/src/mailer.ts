@@ -1,11 +1,8 @@
 import {Component} from '@layr/component';
 import nodemailer from 'nodemailer';
 import aws from 'aws-sdk';
-import env from 'env-var';
 
 const AWS_SES_REGION = 'us-east-1';
-
-const emailAddress = env.get('EMAIL_ADDRESS').required().asString();
 
 const sesClient = new aws.SES({region: AWS_SES_REGION, apiVersion: '2010-12-01'});
 
@@ -16,8 +13,8 @@ const transporter = nodemailer.createTransport({
 
 export class Mailer extends Component {
   static async sendMail({
-    from = emailAddress,
-    to = emailAddress,
+    from = process.env.EMAIL_ADDRESS,
+    to = process.env.EMAIL_ADDRESS,
     subject,
     text,
     html

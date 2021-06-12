@@ -4,133 +4,108 @@ This directory contains the source code of the [CodebaseShow](https://codebase.s
 
 ## About
 
-The website is a single-page application created with [Layr](https://github.com/layrjs/layr). The frontend is statically hosted in AWS S3 + CloudFront and the backend is serverlessly hosted in AWS Lambda + API Gateway. Regarding the database, it is a free-tier MongoDB Atlas cluster with a daily backup that is handled by a Lambda function.
+The CodebaseShow website is a single-page application created with [Layr](https://github.com/layrjs/layr). The frontend is statically hosted in AWS S3 + CloudFront and the backend is serverlessly hosted in AWS Lambda + API Gateway. Regarding the database, it is a free-tier MongoDB Atlas cluster with a daily backup that is handled by a Lambda function.
 
-## Install
+## Prerequisites
 
-Install the npm dependencies with:
+- Make sure your have a [Node.js](https://nodejs.org/) (v14 or newer) installed.
+- Make sure you have [Boostr](https://boostr.dev/) installed as it is used to manage the development environment.
+
+## Installation
+
+Install all the npm dependencies with the following command:
 
 ```sh
-npm install
+boostr install
 ```
 
-## Develop
+## Development
 
-### Prerequisites
+### Configuration
 
-- Make sure you have [Docker](https://www.docker.com/) installed as it is used to execute the MongoDB development database.
 - Create a [GitHub OAuth App](https://github.com/settings/developers) with the following settings:
   - Homepage URL: `http://localhost:15541`
   - Authorization callback URL: `http://localhost:15541/oauth/callback`
 - Create a [GitHub personal access token](https://github.com/settings/tokens) with no scopes selected.
 - Generate a JWT secret by running the following command in your terminal:
   - `openssl rand -hex 64`
-
-### Running the website in development mode
-
-Execute the following command while replacing the `"********"` with the information obtained above:
-
-```sh
-FRONTEND_URL=http://localhost:15541 \
-  BACKEND_URL=http://localhost:15542 \
-  EMAIL_ADDRESS="********" \
-  MONGODB_STORE_CONNECTION_STRING=mongodb://test:test@localhost:15543/test \
-  GITHUB_CLIENT_ID="********" \
-  GITHUB_CLIENT_SECRET="********" \
-  GITHUB_PERSONAL_ACCESS_TOKEN="********" \
-  JWT_SECRET="********" \
-  npm run start
-```
-
-The website should then be available at http://localhost:15541.
+- In the `backend` directory, duplicate the `boostr.config.private-template.mjs` file, name it `boostr.config.private.mjs`, and modify it to set all the required private development environment variables.
 
 ### Migrating the database
 
-Navigate to the `./backend` directory and execute the following command:
+Migrate the database with the following command:
 
 ```sh
-FRONTEND_URL=http://localhost:15541 \
-  BACKEND_URL=http://localhost:15542 \
-  EMAIL_ADDRESS="********" \
-  MONGODB_STORE_CONNECTION_STRING=mongodb://test:test@localhost:15543/test \
-  GITHUB_CLIENT_ID="********" \
-  GITHUB_CLIENT_SECRET="********" \
-  GITHUB_PERSONAL_ACCESS_TOKEN="********" \
-  JWT_SECRET="********" \
-  npm run migrate
+boostr database migrate
 ```
 
-## Debug
+### Starting the development environment
 
-### Client
-
-Add the following entry in the local storage of your browser:
+Start the development environment with the following command:
 
 ```
-| Key   | Value     |
-| ----- | --------- |
-| debug | layr:* |
+boostr start
 ```
 
-### Server
+The website should be available at http://localhost:15541.
 
-Add the following environment variables when starting the website:
+## Production
+
+### Configuration
+
+- Create a [GitHub OAuth App](https://github.com/settings/developers) with the following settings:
+  - Homepage URL: `https://codebase.show`
+  - Authorization callback URL: `https://codebase.show/oauth/callback`
+- Create a [GitHub personal access token](https://github.com/settings/tokens) with no scopes selected.
+- Generate a JWT secret by running the following command in your terminal:
+  - `openssl rand -hex 64`
+- In the `backend` directory, duplicate the `boostr.config.private-template.mjs` file, name it `boostr.config.private.mjs`, and modify it to set all the required private production environment variables.
+- In the `database` directory, duplicate the `boostr.config.private-template.mjs` file, name it `boostr.config.private.mjs`, and modify it to set the `stages.production.url` attribute to the URL of your production MongoDB database.
+- Create an AWS IAM role with the following settings:
+  - Trusted entity: `AWS service`
+  - Use case: `Lambda`
+  - Name: `codebaseshow-website-backend-prod`
+  - Permission policies:
+    - CloudWatchLogsFullAccess
+    - AmazonSESFullAccess
+
+### Migrating the database
+
+Migrate the database with the following command:
 
 ```sh
-DEBUG=layr:* DEBUG_DEPTH=10
+boostr database migrate --production
 ```
 
-## Deploy
+### Deployment
 
-## Deploying to AWS
+Deploy the website to production with the following command:
 
-Create an AWS IAM role:
-
-- Trusted entity: `AWS service`
-- Use case: `Lambda`
-- Name: `codebaseshow-website-backend-prod`
-- Permission policies:
-  - CloudWatchLogsFullAccess
-  - AmazonSESFullAccess
-
-Execute the following command:
-
-```sh
-FRONTEND_URL=https://codebase.show \
-  BACKEND_URL=https://backend.codebase.show \
-  EMAIL_ADDRESS="********" \
-  MONGODB_STORE_CONNECTION_STRING="********" \
-  GITHUB_CLIENT_ID="********" \
-  GITHUB_CLIENT_SECRET="********" \
-  GITHUB_PERSONAL_ACCESS_TOKEN="********" \
-  JWT_SECRET="********" \
-  npm run deploy
+```
+boostr deploy --production
 ```
 
-Add an AWS EventBridge rule to automatically run an hourly task:
+The website should be available at https://codebase.show.
 
-- Name: `codebaseshow-website-hourly-task`
-- Schedule:
-  - Fixed rate every: `1 hour`
-- Target:
-  - Lambda function: `backend-codebase-show`
-  - Constant input: `{"query": {"<=": {"__component": "typeof Application"}, "runHourlyTask=>": {"()": []}}}`
+### Setting up automatic tasks
 
-Add another AWS EventBridge rule to automatically run a daily task:
+- Add an AWS EventBridge rule to automatically run an hourly task:
+  - Name: `codebaseshow-website-hourly-task`
+  - Schedule:
+    - Fixed rate every: `1 hour`
+  - Target:
+    - Lambda function: `backend-codebase-show`
+    - Constant input: `{"query": {"<=": {"__component": "typeof Application"}, "runHourlyTask=>": {"()": []}}}`
+- Add another AWS EventBridge rule to automatically run a daily task:
+  - Name: `codebaseshow-website-daily-task`
+  - Schedule:
+    - Fixed rate every: `1 day`
+  - Target:
+    - Lambda function: `backend-codebase-show`
+    - Constant input: `{"query": {"<=": {"__component": "typeof Application"}, "runDailyTask=>": {"()": []}}}`
 
-- Name: `codebaseshow-website-daily-task`
-- Schedule:
-  - Fixed rate every: `1 day`
-- Target:
-  - Lambda function: `backend-codebase-show`
-  - Constant input: `{"query": {"<=": {"__component": "typeof Application"}, "runDailyTask=>": {"()": []}}}`
-
-## Backup
+### Backup
 
 Once a day, all CodebaseShow public data are automatically backed up to the following repository:
 
 https://github.com/codebaseshow/public-data
-
-## License
-
-MIT
