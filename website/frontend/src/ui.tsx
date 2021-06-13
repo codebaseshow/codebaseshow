@@ -1,7 +1,6 @@
 import {useMemo} from 'react';
 import {jsx, useTheme} from '@emotion/react';
 import {useDelay} from '@layr/react-integration';
-import {Button} from '@emotion-starter/react';
 import {Stack, Box, ErrorIcon} from '@emotion-kit/react';
 import {Helmet} from 'react-helmet';
 import {useWindowHeight} from '@react-hook/window-size';
@@ -88,8 +87,10 @@ export function ButtonBar({
   );
 }
 
-export function ErrorLayout({children}: {children: React.ReactNode}) {
+export function ErrorMessage({children}: {children: string | (Error & {displayMessage?: string})}) {
   const theme = useTheme();
+
+  const message = typeof children === 'string' ? children : formatError(children);
 
   return (
     <div
@@ -104,57 +105,16 @@ export function ErrorLayout({children}: {children: React.ReactNode}) {
       <div>
         <ErrorIcon size={50} color={theme.colors.negative.normal} />
       </div>
-      <div css={{marginTop: '1rem'}}>{children}</div>
+      <div css={{marginTop: '1rem'}}>{message}</div>
     </div>
   );
 }
 
-export function RouteNotFound() {
-  return <ErrorLayout>Sorry, there is nothing there.</ErrorLayout>;
+export function formatError(error: Error & {displayMessage?: string}) {
+  return error?.displayMessage ?? 'Sorry, an error occurred.';
 }
 
-export function ErrorBox({
-  error,
-  onRetry,
-  className
-}: {
-  error?: {displayMessage?: string};
-  onRetry?: Function;
-  className?: string;
-}) {
-  return (
-    <Box className={className} css={{marginBottom: '2rem', padding: '.5rem 1rem'}}>
-      <ErrorMessage error={error} onRetry={onRetry} />
-    </Box>
-  );
-}
-
-export function ErrorMessage({
-  error,
-  onRetry,
-  className
-}: {
-  error?: {displayMessage?: string};
-  onRetry?: Function;
-  className?: string;
-}) {
-  const theme = useTheme();
-
-  const message = error?.displayMessage || 'Sorry, an error occurred.';
-
-  return (
-    <div className={className}>
-      <div css={{color: theme.colors.negative.normal}}>{message}</div>
-      {onRetry && (
-        <div css={{marginTop: '2rem'}}>
-          <Button onClick={() => onRetry()}>Retry</Button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function LoadingSpinner({delay = 750}: {delay?: number}) {
+export function LoadingSpinner({delay}: {delay?: number}) {
   const style = useMemo(
     () => ({
       borderRadius: '50%',
@@ -189,7 +149,7 @@ export function LoadingSpinner({delay = 750}: {delay?: number}) {
 }
 
 export function Delayed({
-  duration = 750,
+  duration = 500,
   children
 }: {
   duration?: number;

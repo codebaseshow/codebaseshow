@@ -13,7 +13,7 @@ import {extendImplementation, implementationCategories} from './implementation';
 import codebaseShowLogo from '../assets/codebaseshow-logo-dark-mode.svg';
 import programmerDude from '../assets/programmer-dude.svg';
 import {useStyles} from '../styles';
-import {Title, FullHeight, ErrorLayout} from '../ui';
+import {Title, FullHeight, ErrorMessage, formatError, LoadingSpinner} from '../ui';
 import {RepositoryIcon} from '../icons';
 
 export const extendApplication = (Base: typeof BackendApplication) => {
@@ -32,8 +32,10 @@ export const extendApplication = (Base: typeof BackendApplication) => {
         >
           <EmotionKit>
             <Customizer
-              errorNotifier={async (error: Error & {displayMessage?: string}) => {
-                alert(error?.displayMessage ?? 'Sorry, an error occurred.');
+              dataPlaceholder={() => <LoadingSpinner />}
+              errorRenderer={(error) => <ErrorMessage>{error}</ErrorMessage>}
+              errorNotifier={async (error) => {
+                alert(formatError(error));
               }}
             >
               <Title />
@@ -391,7 +393,11 @@ export const extendApplication = (Base: typeof BackendApplication) => {
               return <Fragment key={project.id}>{content}</Fragment>;
             })}
           </Stack>
-        )
+        ),
+
+        [],
+
+        {dataPlaceholder: () => <LoadingSpinner delay={0} />}
       );
     }
 
@@ -417,7 +423,7 @@ export const extendApplication = (Base: typeof BackendApplication) => {
     }
 
     @page('[/]*') static NotFoundPage() {
-      return <ErrorLayout>Sorry, there is nothing there.</ErrorLayout>;
+      return <ErrorMessage>Sorry, there is nothing there.</ErrorMessage>;
     }
   }
 

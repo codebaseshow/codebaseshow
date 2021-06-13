@@ -24,7 +24,7 @@ import type {Implementation} from './implementation';
 import {implementationCategories, frontendEnvironments} from './implementation';
 import codebaseShowIcon from '../assets/codebaseshow-icon.svg';
 import {useStyles} from '../styles';
-import {Title, FullHeight, Dialog, ButtonBar, Table} from '../ui';
+import {Title, FullHeight, Dialog, ButtonBar, Table, LoadingSpinner} from '../ui';
 
 const MAXIMUM_NEW_IMPLEMENTATION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -522,7 +522,9 @@ export const extendProject = (Base: typeof BackendProject) => {
           );
         },
 
-        [currentCategory]
+        [currentCategory],
+
+        {dataPlaceholder: () => <LoadingSpinner delay={0} />}
       );
     }
 

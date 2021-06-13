@@ -9,7 +9,7 @@ import {Box, DropdownMenu} from '@emotion-kit/react';
 import type {User as BackendUser} from '../../../backend/src/components/user';
 import type {Application} from './application';
 import type {Implementation} from './implementation';
-import {ErrorLayout, Table} from '../ui';
+import {ErrorMessage, Table} from '../ui';
 
 const githubClientId = process.env.GITHUB_CLIENT_ID;
 
@@ -79,7 +79,7 @@ export const extendUser = (Base: typeof BackendUser) => {
       }
 
       if (!this.authenticatedUser.isAdmin) {
-        return <ErrorLayout>Sorry, this page is restricted to administrators only.</ErrorLayout>;
+        return <ErrorMessage>Sorry, this page is restricted to administrators only.</ErrorMessage>;
       }
 
       return content(this.authenticatedUser);
@@ -198,7 +198,7 @@ export const extendUser = (Base: typeof BackendUser) => {
         }
 
         if (signingInError) {
-          return <ErrorLayout>Sorry, an error occurred while signing in to GitHub.</ErrorLayout>;
+          return <ErrorMessage>Sorry, an error occurred while signing in to GitHub.</ErrorMessage>;
         }
 
         return null;
