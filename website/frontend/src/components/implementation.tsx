@@ -2,6 +2,7 @@ import {consume} from '@layr/component';
 import {Routable} from '@layr/routable';
 import {useState} from 'react';
 import {page, view, useData, useAction, useNavigator} from '@layr/react-integration';
+import {throwError} from '@layr/utilities';
 import {jsx, useTheme} from '@emotion/react';
 import {Input, Select, Button} from '@emotion-starter/react';
 import {Stack, Box, Badge, ComboBox, DropdownMenu, LaunchIcon} from '@emotion-kit/react';
@@ -125,9 +126,6 @@ export const extendImplementation = (Base: typeof BackendImplementation) => {
 
     @page('[/projects/:project.slug]/implementations/:id/edit', {params: {callbackURL: 'string?'}})
     EditPage({callbackURL = this.project.ItemPage.generateURL()}: {callbackURL?: string}) {
-      // TODO: Make sure an implementation cannot be displayed with a project it doesn't belong to
-      // by configuring the `Project#slug` attribute as immutable
-
       const {User} = this.constructor;
 
       return User.ensureAuthenticatedUser(() => {
@@ -313,13 +311,13 @@ export const extendImplementation = (Base: typeof BackendImplementation) => {
             });
 
             if (this.unmaintainedIssueNumber !== undefined) {
-              throw Object.assign(new Error('Implementation already reported as unmaintained'), {
+              throwError('Implementation already reported as unmaintained', {
                 displayMessage: 'This implementation has already been reported as unmaintained.'
               });
             }
 
             if (this.markedAsUnmaintainedOn !== undefined) {
-              throw Object.assign(new Error('Implementation already marked as unmaintained'), {
+              throwError('Implementation already marked as unmaintained', {
                 displayMessage: 'This implementation has already been marked as unmaintained.'
               });
             }
@@ -620,7 +618,7 @@ export const extendImplementation = (Base: typeof BackendImplementation) => {
       const styles = useStyles();
 
       const ensureEmptyLibraryItem = () => {
-        if (this.libraries[this.libraries.length - 1] !== '') {
+        if (this.libraries[this.libraries.length - 1] !== '' && this.libraries.length < 5) {
           this.libraries = [...this.libraries, ''];
         }
       };

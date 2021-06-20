@@ -31,7 +31,7 @@ export class Project extends WithOwner(Entity) {
 
   @consume() static Implementation: typeof Implementation;
 
-  @expose({get: true, set: true})
+  @expose({get: true})
   @secondaryIdentifier('string', {validators: [rangeLength([1, 64])]})
   slug!: string;
 

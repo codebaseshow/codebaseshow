@@ -13,7 +13,7 @@ import {extendImplementation, implementationCategories} from './implementation';
 import codebaseShowLogo from '../assets/codebaseshow-logo-dark-mode.svg';
 import programmerDude from '../assets/programmer-dude.svg';
 import {useStyles} from '../styles';
-import {Title, FullHeight, ErrorMessage, formatError, LoadingSpinner} from '../ui';
+import {Title, FullHeight, ErrorMessage, LoadingSpinner} from '../ui';
 import {RepositoryIcon} from '../icons';
 
 export const extendApplication = (Base: typeof BackendApplication) => {
@@ -34,9 +34,6 @@ export const extendApplication = (Base: typeof BackendApplication) => {
             <Customizer
               dataPlaceholder={() => <LoadingSpinner />}
               errorRenderer={(error) => <ErrorMessage>{error}</ErrorMessage>}
-              errorNotifier={async (error) => {
-                alert(formatError(error));
-              }}
             >
               <Title />
               {children()}

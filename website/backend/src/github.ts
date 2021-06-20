@@ -1,4 +1,5 @@
 import {Component} from '@layr/component';
+import {throwError} from '@layr/utilities';
 import fetch from 'cross-fetch';
 
 const GITHUB_API_BASE_URL = 'https://api.github.com/';
@@ -31,7 +32,7 @@ export class GitHub extends Component {
     }
 
     if (email === undefined) {
-      throw Object.assign(new Error('Primary email not found'), {
+      throwError('Primary email not found', {
         displayMessage: `Couldn't get your email address from GitHub. Please make sure you have a verified primary address in your GitHub account`
       });
     }
@@ -46,7 +47,7 @@ export class GitHub extends Component {
       githubData = await this.fetch(`repos/${owner}/${name}`);
     } catch (error) {
       if (error.status === 404) {
-        throw Object.assign(new Error('Repository not found'), {
+        throwError('Repository not found', {
           displayMessage: `The specified repository doesn't exist.`,
           code: 'REPOSITORY_NOT_FOUND'
         });
@@ -72,9 +73,7 @@ export class GitHub extends Component {
       data = await this.fetch(`repos/${owner}/${name}/issues/${String(number)}`);
     } catch (error) {
       if (error.status === 404) {
-        throw Object.assign(new Error('Issue not found'), {
-          displayMessage: `The specified issue doesn't exist.`
-        });
+        throwError('Issue not found', {displayMessage: `The specified issue doesn't exist.`});
       }
 
       throw error;
@@ -134,7 +133,7 @@ export class GitHub extends Component {
     }
 
     if (contributors.length === 100) {
-      throw Object.assign(new Error('Cannot fetch more than 100 contributors'), {
+      throwError('Cannot fetch more than 100 contributors', {
         displayMessage:
           'The specified repository have a lot of contributors and we are currently unable to fetch them all.'
       });

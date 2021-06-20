@@ -4,6 +4,7 @@ import {useDelay} from '@layr/react-integration';
 import {Stack, Box, ErrorIcon} from '@emotion-kit/react';
 import {Helmet} from 'react-helmet';
 import {useWindowHeight} from '@react-hook/window-size';
+import {formatError} from '@layr/utilities';
 
 export function Title({children: title}: {children?: string}) {
   if (title === undefined) {
@@ -87,7 +88,7 @@ export function ButtonBar({
   );
 }
 
-export function ErrorMessage({children}: {children: string | (Error & {displayMessage?: string})}) {
+export function ErrorMessage({children}: {children: string | Error}) {
   const theme = useTheme();
 
   const message = typeof children === 'string' ? children : formatError(children);
@@ -108,10 +109,6 @@ export function ErrorMessage({children}: {children: string | (Error & {displayMe
       <div css={{marginTop: '1rem'}}>{message}</div>
     </div>
   );
-}
-
-export function formatError(error: Error & {displayMessage?: string}) {
-  return error?.displayMessage ?? 'Sorry, an error occurred.';
 }
 
 export function LoadingSpinner({delay}: {delay?: number}) {

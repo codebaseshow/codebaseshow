@@ -1,6 +1,6 @@
-import {consume, expose, validators, AttributeSelector} from '@layr/component';
+import {consume, expose, sanitizers, validators, AttributeSelector} from '@layr/component';
 import {attribute, method, index, finder} from '@layr/storable';
-import compact from 'lodash/compact';
+import {throwError} from '@layr/utilities';
 import escape from 'lodash/escape';
 
 import type {User} from './user';
@@ -11,6 +11,7 @@ import {GitHub} from '../github';
 import {Mailer} from '../mailer';
 import {generateJWT, verifyJWT} from '../jwt';
 
+const {trim, compact} = sanitizers;
 const {optional, maxLength, rangeLength, match, anyOf, integer, positive} = validators;
 
 export const IMPLEMENTATION_CATEGORIES = ['frontend', 'backend', 'fullstack'] as const;
@@ -68,12 +69,7 @@ export class Implementation extends WithOwner(Entity) {
 
   @expose({get: true, set: ['owner', 'admin']})
   @attribute('string', {
-    beforeSave(this: Implementation, attribute) {
-      // TODO: Simplify by implementing the concept of transformers/normalizers
-      attribute.setValue((attribute.getValue() as string).trim(), {
-        source: attribute.getValueSource()
-      });
-    },
+    sanitizers: [trim()],
     validators: [maxLength(500), match(/^https\:\/\/github\.com\//)]
   })
   repositoryURL!: string;
@@ -101,36 +97,15 @@ export class Implementation extends WithOwner(Entity) {
 
   @expose({get: true, set: ['owner', 'admin']})
   @index()
-  @attribute('string', {
-    beforeSave(this: Implementation, attribute) {
-      // TODO: Simplify by implementing the concept of transformers/normalizers
-      attribute.setValue((attribute.getValue() as string).trim(), {
-        source: attribute.getValueSource()
-      });
-    },
-    validators: [rangeLength([1, 100])]
-  })
+  @attribute('string', {sanitizers: [trim()], validators: [rangeLength([1, 100])]})
   language!: string;
 
   @expose({get: true, set: ['owner', 'admin']})
   @index()
   @attribute('string[]', {
-    beforeSave(this: Implementation, attribute) {
-      // TODO: Simplify by implementing the concept of transformers/normalizers
-      const libraries = compact(
-        (attribute.getValue() as string[]).map((library) => library.trim())
-      );
-
-      if (libraries.length === 0) {
-        throw Object.assign(new Error(`'libraries' cannot be empty`), {
-          displayMessage: 'You must specify at least one library or framework.'
-        });
-      }
-
-      attribute.setValue(libraries, {source: attribute.getValueSource()});
-    },
-    validators: [rangeLength([1, 5])],
-    items: {validators: [rangeLength([1, 50])]}
+    sanitizers: [compact()],
+    validators: [rangeLength([1, 5], 'You must specify at least one library or framework.')],
+    items: {sanitizers: [trim()], validators: [rangeLength([1, 50])]}
   })
   libraries!: string[];
 
@@ -210,7 +185,7 @@ export class Implementation extends WithOwner(Entity) {
         const contributor = await GitHub.findRepositoryContributor({owner, name, userId});
 
         if (contributor === undefined) {
-          throw Object.assign(new Error(`Contributor not found`), {
+          throwError(`Contributor not found`, {
             displayMessage: 'Sorry, you must be a contributor of the specified repository.'
           });
         }
@@ -218,13 +193,11 @@ export class Implementation extends WithOwner(Entity) {
     }
 
     if (isArchived) {
-      throw Object.assign(new Error(`Repository archived`), {
-        displayMessage: 'The specified repository is archived.'
-      });
+      throwError(`Repository archived`, {displayMessage: 'The specified repository is archived.'});
     }
 
     if (!hasIssues) {
-      throw Object.assign(new Error(`Repository issues disabled`), {
+      throwError(`Repository issues disabled`, {
         displayMessage:
           'Sorry, you cannot submit an implementation with a repository that has the "Issues" feature disabled.'
       });
@@ -277,12 +250,12 @@ export class Implementation extends WithOwner(Entity) {
       const reviewDuration = Date.now() - this.reviewStartedOn!.valueOf();
 
       if (this.reviewer !== authenticatedUser && reviewDuration < MAXIMUM_REVIEW_DURATION) {
-        throw Object.assign(new Error('Implementation currently reviewed'), {
+        throwError('Implementation currently reviewed', {
           displayMessage: 'This submission is currently being reviewed by another administrator.'
         });
       }
     } else if (this.status !== 'pending') {
-      throw Object.assign(new Error('Implementation already reviewed'), {
+      throwError('Implementation already reviewed', {
         displayMessage: 'This submission has already been reviewed.'
       });
     }
@@ -415,9 +388,7 @@ export class Implementation extends WithOwner(Entity) {
     const issue = await GitHub.fetchIssue({owner, name, number: issueNumber});
 
     if (issue.isClosed) {
-      throw Object.assign(new Error('Issue closed'), {
-        displayMessage: `The specified issue is closed.`
-      });
+      throwError('Issue closed', {displayMessage: `The specified issue is closed.`});
     }
 
     const implementationURL = `${process.env.FRONTEND_URL}projects/${this.project.slug}/implementations/${this.id}/edit`;
@@ -558,7 +529,7 @@ Owner:
     });
 
     if (!this.owner.isAdmin) {
-      throw Object.assign(new Error(`Implementation not owned by an admin`), {
+      throwError(`Implementation not owned by an admin`, {
         displayMessage:
           'Sorry but for now only implementations that have been added by a CodebaseShow administrator can be claimed.'
       });
@@ -574,7 +545,7 @@ Owner:
       const contributor = await GitHub.findRepositoryContributor({owner, name, userId});
 
       if (contributor === undefined) {
-        throw Object.assign(new Error(`User is not a maintainer`), {
+        throwError(`User is not a maintainer`, {
           displayMessage:
             'Sorry but it was not possible to verify that you are the maintainer of this implementation.'
         });
@@ -761,7 +732,7 @@ New owner:
 
 function parseRepositoryURL(url: string) {
   if (!url.startsWith('https://github.com')) {
-    throw Object.assign(new Error('Not a GitHub URL'), {
+    throwError('Not a GitHub URL', {
       displayMessage: 'Sorry, only GitHub repositories are supported.'
     });
   }
@@ -773,7 +744,7 @@ function parseRepositoryURL(url: string) {
   const matches = url.match(/^https\:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(.+)?$/);
 
   if (matches === null) {
-    throw Object.assign(new Error('Invalid repository URL'), {
+    throwError('Invalid repository URL', {
       displayMessage: 'The specified repository URL is invalid.'
     });
   }

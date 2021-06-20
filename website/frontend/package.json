@@ -9,11 +9,12 @@
     "@emotion-kit/react": "^1.0.54",
     "@emotion-starter/react": "^1.0.55",
     "@emotion/react": "^11.1.5",
-    "@layr/component": "^2.0.0",
-    "@layr/component-http-client": "^2.0.0",
-    "@layr/react-integration": "^2.0.67",
-    "@layr/routable": "^2.0.51",
-    "@layr/storable": "^2.0.15",
+    "@layr/component": "^2.0.13",
+    "@layr/component-http-client": "^2.0.16",
+    "@layr/react-integration": "^2.0.72",
+    "@layr/routable": "^2.0.55",
+    "@layr/storable": "^2.0.21",
+    "@layr/utilities": "^1.0.1",
     "@react-hook/window-size": "^3.0.7",
     "date-fns": "^2.21.1",
     "lodash": "^4.17.21",
@@ -28,7 +29,7 @@
     "@types/node": "^14.17.3",
     "@types/numeral": "0.0.28",
     "@types/react": "^17.0.11",
-    "@types/react-dom": "^17.0.7",
+    "@types/react-dom": "^17.0.8",
     "@types/react-helmet": "^6.1.1"
   }
 }
