@@ -13,5 +13,13 @@ export default () => ({
 
   environment: {
     EMAIL_ADDRESS: 'hello@codebase.show'
+  },
+
+  stages: {
+    production: {
+      environment: {
+        NODE_ENV: 'production'
+      }
+    }
   }
 });
