@@ -1,4 +1,3 @@
-import {Component} from '@layr/component';
 import nodemailer from 'nodemailer';
 import aws from 'aws-sdk';
 
@@ -11,20 +10,18 @@ const transporter = nodemailer.createTransport({
   sendingRate: 1
 });
 
-export class Mailer extends Component {
-  static async sendMail({
-    from = process.env.EMAIL_ADDRESS,
-    to = process.env.EMAIL_ADDRESS,
-    subject,
-    text,
-    html
-  }: {
-    from?: string;
-    to?: string;
-    subject: string;
-    text?: string;
-    html?: string;
-  }) {
-    await transporter.sendMail({from, to, subject, text, html});
-  }
+export async function sendMail({
+  from = process.env.EMAIL_ADDRESS,
+  to = process.env.EMAIL_ADDRESS,
+  subject,
+  text,
+  html
+}: {
+  from?: string;
+  to?: string;
+  subject: string;
+  text?: string;
+  html?: string;
+}) {
+  await transporter.sendMail({from, to, subject, text, html});
 }

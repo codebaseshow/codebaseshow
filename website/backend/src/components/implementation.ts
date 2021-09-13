@@ -8,7 +8,7 @@ import type {Project} from './project';
 import {Entity} from './entity';
 import {WithOwner} from './with-owner';
 import {GitHub} from '../github';
-import {Mailer} from '../mailer';
+import {sendMail} from '../mailer';
 import {generateJWT, verifyJWT} from '../jwt';
 
 const {trim, compact} = sanitizers;
@@ -211,7 +211,7 @@ export class Implementation extends WithOwner(Entity) {
     await this.project.load({slug: true, name: true});
 
     try {
-      await Mailer.sendMail({
+      await sendMail({
         subject: `A new ${this.project.name} implementation has been submitted`,
         text: `A new ${this.project.name} implementation has been submitted:\n\n${process.env.FRONTEND_URL}projects/${this.project.slug}/implementations/${this.id}/review\n`
       });
@@ -291,7 +291,7 @@ export class Implementation extends WithOwner(Entity) {
     await this.save();
 
     try {
-      await Mailer.sendMail({
+      await sendMail({
         to: this.owner.email,
         subject: `Your ${this.project.name} implementation has been approved`,
         html: `
@@ -336,7 +336,7 @@ export class Implementation extends WithOwner(Entity) {
     await this.save({status: true, reviewStartedOn: true});
 
     try {
-      await Mailer.sendMail({
+      await sendMail({
         to: this.owner.email,
         subject: `Your ${this.project.name} implementation could not be approved`,
         html: `
@@ -440,7 +440,7 @@ Click the following link to approve the report:
 </p>
 `;
 
-    await Mailer.sendMail({
+    await sendMail({
       subject: `A ${this.project.name} implementation has been reported as unmaintained`,
       html
     });
@@ -508,7 +508,7 @@ Owner:
 </p>
 `;
 
-    await Mailer.sendMail({
+    await sendMail({
       subject: `A ${this.project.name} implementation has been marked as unmaintained by its owner`,
       html
     });
@@ -593,7 +593,7 @@ New owner:
 </p>
 `;
 
-    await Mailer.sendMail({
+    await sendMail({
       subject: `The ownership of a ${this.project.name} implementation has been claimed`,
       html
     });
