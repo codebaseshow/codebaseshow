@@ -1,4 +1,5 @@
 import {Component, provide, method, expose} from '@layr/component';
+import {HOUR, DAY} from '@layr/utilities';
 
 import {User} from './user';
 import {Project} from './project';
@@ -9,12 +10,7 @@ export class Application extends Component {
   @provide() static Project = Project;
   @provide() static Implementation = Implementation;
 
-  @expose({call: true}) @method() static async runHourlyTask() {
-    // This method is executed 24 times a day
-
-    // Trigger the execution in development mode with:
-    // time curl -v -X POST -H "Content-Type: application/json" -d '{"query": {"<=": {"__component": "typeof Application"}, "runHourlyTask=>": {"()": []}}}' http://localhost:15542
-
+  @expose({call: true}) @method({schedule: {rate: 1 * HOUR}}) static async runHourlyTask() {
     const {Implementation} = this;
 
     const numberOfImplementations = await Implementation.count();
@@ -22,12 +18,7 @@ export class Application extends Component {
     await Implementation.refreshGitHubData({limit});
   }
 
-  @expose({call: true}) @method() static async runDailyTask() {
-    // This method is executed once a day
-
-    // Trigger the execution in development mode with:
-    // time curl -v -X POST -H "Content-Type: application/json" -d '{"query": {"<=": {"__component": "typeof Application"}, "runDailyTask=>": {"()": []}}}' http://localhost:15542
-
+  @expose({call: true}) @method({schedule: {rate: 1 * DAY}}) static async runDailyTask() {
     const {Project, Implementation} = this;
 
     await Implementation.checkMaintenanceStatus();

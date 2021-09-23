@@ -87,23 +87,6 @@ boostr deploy --production
 
 The website should be available at https://codebase.show.
 
-### Setting up automatic tasks
-
-- Add an AWS EventBridge rule to automatically run an hourly task:
-  - Name: `codebaseshow-website-hourly-task`
-  - Schedule:
-    - Fixed rate every: `1 hour`
-  - Target:
-    - Lambda function: `backend-codebase-show`
-    - Constant input: `{"query": {"<=": {"__component": "typeof Application"}, "runHourlyTask=>": {"()": []}}}`
-- Add another AWS EventBridge rule to automatically run a daily task:
-  - Name: `codebaseshow-website-daily-task`
-  - Schedule:
-    - Fixed rate every: `1 day`
-  - Target:
-    - Lambda function: `backend-codebase-show`
-    - Constant input: `{"query": {"<=": {"__component": "typeof Application"}, "runDailyTask=>": {"()": []}}}`
-
 ### Backup
 
 Once a day, all CodebaseShow public data are automatically backed up to the following repository:
