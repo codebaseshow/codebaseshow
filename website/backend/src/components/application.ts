@@ -1,5 +1,5 @@
 import {Component, provide, method, expose} from '@layr/component';
-import {HOUR, DAY} from '@layr/utilities';
+import {MINUTE, HOUR, DAY} from '@layr/utilities';
 
 import {User} from './user';
 import {Project} from './project';
@@ -10,7 +10,9 @@ export class Application extends Component {
   @provide() static Project = Project;
   @provide() static Implementation = Implementation;
 
-  @expose({call: true}) @method({schedule: {rate: 1 * HOUR}}) static async runHourlyTask() {
+  @expose({call: true})
+  @method({schedule: {rate: 1 * HOUR}, maximumDuration: 10 * MINUTE})
+  static async runHourlyTask() {
     const {Implementation} = this;
 
     const numberOfImplementations = await Implementation.count();
@@ -18,7 +20,9 @@ export class Application extends Component {
     await Implementation.refreshGitHubData({limit});
   }
 
-  @expose({call: true}) @method({schedule: {rate: 1 * DAY}}) static async runDailyTask() {
+  @expose({call: true})
+  @method({schedule: {rate: 1 * DAY}, maximumDuration: 10 * MINUTE})
+  static async runDailyTask() {
     const {Project, Implementation} = this;
 
     await Implementation.checkMaintenanceStatus();

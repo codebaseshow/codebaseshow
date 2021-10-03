@@ -25,8 +25,7 @@ export default ({services}) => ({
         region: 'us-west-2',
         lambda: {
           executionRole: 'codebaseshow-website-backend-prod',
-          memorySize: 1024,
-          timeout: 15 * 60 // 15 minutes
+          memorySize: 1024
         }
       }
     }
