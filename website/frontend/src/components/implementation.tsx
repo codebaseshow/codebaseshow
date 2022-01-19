@@ -889,16 +889,14 @@ export const extendImplementation = (Base: typeof BackendImplementation) => {
           items={[
             (isOwnedByAuthenticatedUser || isAdmin) && {
               label: 'Edit',
-              onClick: (event) => {
-                event.preventDefault();
+              onClick: () => {
                 this.EditPage.navigate({callbackURL: navigator.getCurrentURL()});
               }
             },
             !(isOwnedByAuthenticatedUser || isAdmin)
               ? {
                   label: 'Report as unmaintained',
-                  onClick: (event) => {
-                    event.preventDefault();
+                  onClick: () => {
                     this.ReportAsUnmaintainedPage.navigate({
                       callbackURL: navigator.getCurrentURL()
                     });
@@ -906,8 +904,7 @@ export const extendImplementation = (Base: typeof BackendImplementation) => {
                 }
               : {
                   label: 'Mark as unmaintained',
-                  onClick: (event) => {
-                    event.preventDefault();
+                  onClick: () => {
                     this.MarkAsUnmaintainedPage.navigate({
                       callbackURL: navigator.getCurrentURL()
                     });
@@ -915,8 +912,7 @@ export const extendImplementation = (Base: typeof BackendImplementation) => {
                 },
             !isOwnedByAuthenticatedUser && {
               label: 'Claim ownership',
-              onClick: (event) => {
-                event.preventDefault();
+              onClick: () => {
                 this.ClaimOwnershipPage.navigate({
                   callbackURL: navigator.getCurrentURL()
                 });
