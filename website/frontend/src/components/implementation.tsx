@@ -1,6 +1,6 @@
 import {consume} from '@layr/component';
 import {Routable} from '@layr/routable';
-import {useState} from 'react';
+import {Fragment, useState} from 'react';
 import {page, view, useData, useAction, useNavigator} from '@layr/react-integration';
 import {throwError} from '@layr/utilities';
 import {jsx, useTheme} from '@emotion/react';
@@ -8,6 +8,7 @@ import {Input, Select, Button} from '@emotion-starter/react';
 import {Stack, Box, Badge, ComboBox, DropdownMenu, LaunchIcon} from '@emotion-kit/react';
 import {formatDistanceToNowStrict} from 'date-fns';
 import sortBy from 'lodash/sortBy';
+import fill from 'lodash/fill';
 
 import type {
   Implementation as BackendImplementation,
@@ -617,6 +618,18 @@ export const extendImplementation = (Base: typeof BackendImplementation) => {
     }) {
       const styles = useStyles();
 
+      const requirementDescriptions = [
+        'I have implemented all the required features.',
+        'My implementation is available on a dedicated GitHub repository with the "Issues" section open.',
+        'I provide a README that presents an overview of my implementation and explains how to run it locally.',
+        'The library/framework I am using has at least 300 GitHub stars.',
+        'I will do my best to keep my implementation up to date.'
+      ];
+
+      const [requirementAcceptances, setRequirementAcceptances] = useState(() =>
+        fill(Array(requirementDescriptions.length), false)
+      );
+
       const ensureEmptyLibraryItem = () => {
         if (this.libraries[this.libraries.length - 1] !== '' && this.libraries.length < 5) {
           this.libraries = [...this.libraries, ''];
@@ -665,6 +678,10 @@ export const extendImplementation = (Base: typeof BackendImplementation) => {
                         event.preventDefault();
 
                         if (onSubmit) {
+                          if (!requirementAcceptances.every((acceptance) => acceptance)) {
+                            alert('Please check all the boxes.');
+                            return;
+                          }
                           onSubmit();
                         } else if (onAdd) {
                           onAdd();
@@ -788,6 +805,33 @@ export const extendImplementation = (Base: typeof BackendImplementation) => {
                     </Stack>
                   </div>
                 </Stack>
+
+                {onSubmit && (
+                  <>
+                    <hr />
+
+                    <Stack direction="column">
+                      {requirementDescriptions.map((description, index) => (
+                        <div key={index} css={{display: 'flex', flexDirection: 'row'}}>
+                          <div css={{flexShrink: 0, marginTop: 2, marginRight: 3}}>
+                            <Input
+                              id={`requirement${index}`}
+                              type="checkbox"
+                              checked={requirementAcceptances[index]}
+                              onChange={(event) => {
+                                const newRequirementAcceptances = [...requirementAcceptances];
+                                newRequirementAcceptances[index] = event.target.checked;
+                                setRequirementAcceptances(newRequirementAcceptances);
+                              }}
+                              required
+                            />
+                          </div>
+                          <label htmlFor={`requirement${index}`}>{description}</label>
+                        </div>
+                      ))}
+                    </Stack>
+                  </>
+                )}
 
                 <ButtonBar>
                   {onSubmit && (
