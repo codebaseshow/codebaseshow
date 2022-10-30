@@ -612,7 +612,7 @@ New owner:
     for (const implementation of implementations) {
       try {
         await implementation.checkMaintenanceStatus();
-      } catch (error) {
+      } catch (error: any) {
         console.error(
           `An error occurred while checking the maintenance status of the implementation '${implementation.repositoryURL}' (${error.message})`
         );
@@ -714,7 +714,7 @@ New owner:
       console.log(
         `The implementation '${this.repositoryURL}' has been successfully refreshed (id: '${this.id}')`
       );
-    } catch (error) {
+    } catch (error: any) {
       if (error.code === 'REPOSITORY_NOT_FOUND') {
         this.repositoryStatus = 'missing';
       } else {

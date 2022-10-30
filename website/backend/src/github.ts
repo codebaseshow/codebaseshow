@@ -45,7 +45,7 @@ export class GitHub extends Component {
 
     try {
       githubData = await this.fetch(`repos/${owner}/${name}`);
-    } catch (error) {
+    } catch (error: any) {
       if (error.status === 404) {
         throwError('Repository not found', {
           displayMessage: `The specified repository doesn't exist.`,
@@ -71,7 +71,7 @@ export class GitHub extends Component {
 
     try {
       data = await this.fetch(`repos/${owner}/${name}/issues/${String(number)}`);
-    } catch (error) {
+    } catch (error: any) {
       if (error.status === 404) {
         throwError('Issue not found', {displayMessage: `The specified issue doesn't exist.`});
       }
@@ -173,7 +173,7 @@ export class GitHub extends Component {
       }
 
       return {content: Buffer.from(data.content, 'base64'), sha: data.sha};
-    } catch (error) {
+    } catch (error: any) {
       if (error.status === 404) {
         return undefined;
       }
