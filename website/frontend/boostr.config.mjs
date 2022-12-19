@@ -9,6 +9,8 @@ export default ({application, services}) => ({
     GITHUB_CLIENT_ID: services.backend.environment.GITHUB_CLIENT_ID
   },
 
+  rootComponent: './src/index.ts',
+
   html: {
     language: 'en',
     head: {
