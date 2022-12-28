@@ -260,7 +260,7 @@ export const extendProject = (Base: typeof BackendProject) => {
                 </Application.ProjectsPage.Link>
 
                 <a
-                  href={`mailto:${process.env.EMAIL_ADDRESS}`}
+                  href={`mailto:${process.env.APPLICATION_EMAIL_ADDRESS}`}
                   target="_blank"
                   css={styles.menuItemLink}
                 >

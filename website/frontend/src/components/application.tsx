@@ -140,7 +140,7 @@ export const extendApplication = (Base: typeof BackendApplication) => {
             <div css={theme.responsive({marginTop: [, , , '1rem']})}>
               <Stack direction="column">
                 <a
-                  href={`mailto:${process.env.EMAIL_ADDRESS}`}
+                  href={`mailto:${process.env.APPLICATION_EMAIL_ADDRESS}`}
                   target="_blank"
                   css={styles.menuItemLink}
                 >
@@ -410,7 +410,7 @@ export const extendApplication = (Base: typeof BackendApplication) => {
             <strong>Want to add your own project?</strong>
           </div>
           <div css={{textAlign: 'center'}}>
-            <a href={`mailto:${process.env.EMAIL_ADDRESS}`} target="_blank">
+            <a href={`mailto:${process.env.APPLICATION_EMAIL_ADDRESS}`} target="_blank">
               Contact us
             </a>{' '}
             to discuss about it!

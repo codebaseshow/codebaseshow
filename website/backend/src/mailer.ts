@@ -11,8 +11,8 @@ const transporter = nodemailer.createTransport({
 });
 
 export async function sendMail({
-  from = process.env.EMAIL_ADDRESS,
-  to = process.env.EMAIL_ADDRESS,
+  from = process.env.APPLICATION_EMAIL_ADDRESS,
+  to = process.env.APPLICATION_EMAIL_ADDRESS,
   subject,
   text,
   html
