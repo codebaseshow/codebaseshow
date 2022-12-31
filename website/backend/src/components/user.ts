@@ -11,7 +11,7 @@ const TOKEN_DURATION = 31536000000; // 1 year
 
 @expose({get: {call: true}, prototype: {load: {call: true}, save: {call: 'self'}}})
 export class User extends Entity {
-  ['constructor']!: typeof User;
+  declare ['constructor']: typeof User;
 
   @secondaryIdentifier('number') githubId!: number;
 

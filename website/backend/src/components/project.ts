@@ -27,7 +27,7 @@ const PUBLIC_DATA_REPOSITORY_PATH = 'public-data.json';
 })
 @index({numberOfImplementations: 'desc', status: 'asc'})
 export class Project extends WithOwner(Entity) {
-  ['constructor']!: typeof Project;
+  declare ['constructor']: typeof Project;
 
   @consume() static Implementation: typeof Implementation;
 

@@ -19,7 +19,7 @@ if (!githubClientId) {
 
 export const extendUser = (Base: typeof BackendUser) => {
   class User extends Routable(Base) {
-    ['constructor']!: typeof User;
+    declare ['constructor']: typeof User;
 
     @consume() static Application: typeof Application;
     @consume() static Implementation: typeof Implementation;

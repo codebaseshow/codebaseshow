@@ -118,7 +118,7 @@ const popularLibraries = [
 
 export const extendImplementation = (Base: typeof BackendImplementation) => {
   class Implementation extends Routable(Base) {
-    ['constructor']!: typeof Implementation;
+    declare ['constructor']: typeof Implementation;
 
     @consume() static User: typeof User;
     @consume() static Project: typeof Project;

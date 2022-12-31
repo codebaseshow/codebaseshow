@@ -7,7 +7,7 @@ import type {Entity} from './entity';
 
 export const WithOwner = (Base: typeof Entity) => {
   class WithOwner extends Base {
-    ['constructor']!: typeof WithOwner;
+    declare ['constructor']: typeof WithOwner;
 
     @consume() static User: typeof User;
 

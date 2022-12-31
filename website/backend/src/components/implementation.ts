@@ -59,7 +59,7 @@ const ADMIN_TOKEN_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 })
 @index({owner: 'asc', createdAt: 'desc'})
 export class Implementation extends WithOwner(Entity) {
-  ['constructor']!: typeof Implementation;
+  declare ['constructor']: typeof Implementation;
 
   @consume() static Project: typeof Project;
 

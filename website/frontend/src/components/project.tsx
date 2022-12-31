@@ -30,7 +30,7 @@ const MAXIMUM_NEW_IMPLEMENTATION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export const extendProject = (Base: typeof BackendProject) => {
   class Project extends Routable(Base) {
-    ['constructor']!: typeof Project;
+    declare ['constructor']: typeof Project;
 
     @consume() static Application: typeof Application;
     @consume() static User: typeof User;
