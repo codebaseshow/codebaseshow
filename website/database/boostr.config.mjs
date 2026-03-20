@@ -3,8 +3,8 @@ export default () => ({
 
   stages: {
     development: {
-      url: 'mongodb://localhost:15543/dev',
-      platform: 'local'
+      url: process.env.DATABASE_URL || 'mongodb://localhost:15543/dev',
+      ...(process.env.DATABASE_URL ? {} : {platform: 'local'})
     }
   }
 });

@@ -2,8 +2,8 @@ import {Component} from '@layr/component';
 import {throwError} from '@layr/utilities';
 import fetch from 'cross-fetch';
 
-const GITHUB_API_BASE_URL = 'https://api.github.com/';
-const GITHUB_LOGIN_URL = 'https://github.com/login/oauth/access_token';
+const GITHUB_API_BASE_URL = process.env.GITHUB_API_BASE_URL || 'https://api.github.com/';
+const GITHUB_LOGIN_URL = process.env.GITHUB_LOGIN_URL || 'https://github.com/login/oauth/access_token';
 
 const PENDING_ISSUE_MINIMUM_AGE = 10 * 24 * 60 * 60 * 1000; // 10 days
 
